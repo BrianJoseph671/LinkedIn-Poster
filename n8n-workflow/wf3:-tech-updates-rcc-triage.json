@@ -1,0 +1,1728 @@
+{
+  "updatedAt": "2026-02-18T18:05:26.033Z",
+  "createdAt": "2026-01-31T19:03:53.904Z",
+  "id": "kzzQuBk8ruxUDWZy",
+  "name": "WF3: Tech Updates RCC Triage",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "search",
+        "base": {
+          "__rl": true,
+          "value": "appvWjinwsRDhMlWF",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Post Copilot",
+          "cachedResultUrl": "https://airtable.com/appvWjinwsRDhMlWF"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblLSUtjPhFe2pe1J",
+          "mode": "list",
+          "cachedResultName": "RSS_Sources",
+          "cachedResultUrl": "https://airtable.com/appvWjinwsRDhMlWF/tblLSUtjPhFe2pe1J"
+        },
+        "filterByFormula": "={active} = TRUE()",
+        "options": {}
+      },
+      "id": "lc-rss-get-feeds",
+      "name": "Get Active Feeds",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [
+        224,
+        400
+      ],
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "meUymQhIYdbiv1Zh",
+          "name": "LinkedIn Posting Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "={{ $json['RSS Feed URL'] }}",
+        "options": {}
+      },
+      "id": "lc-rss-read",
+      "name": "Read RSS Feed",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [
+        672,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// n8n Code node: Filter New (and optionally relevance later)\n\n// 1) Pull the feed cursor (Last Item Published At) from the current feed record\n// Depending on node output, it may be at $json.fields['Last Item Published At'] or $json['Last Item Published At']\nconst feed = $('Loop Each Feed').first().json;\nconst cursorRaw =\n  feed?.fields?.['Last Item Published At'] ??\n  feed?.['Last Item Published At'] ??\n  null;\n\n// Airtable Date field usually comes through as ISO string. If empty, treat as null.\nconst cursor = cursorRaw ? new Date(cursorRaw) : null;\n\n// 2) Helper to parse RSS pubDate variants\nfunction parsePubDate(itemJson) {\n  const raw =\n    itemJson.pubDate ??\n    itemJson.isoDate ??\n    itemJson.published ??\n    itemJson.date ??\n    null;\n\n  if (!raw) return null;\n\n  const d = new Date(raw);\n  return isNaN(d.getTime()) ? null : d;\n}\n\n// 3) Filter: if no cursor, treat all as new. Else only keep pubDate > cursor.\nconst out = [];\n\nfor (const item of $input.all()) {\n  const pub = parsePubDate(item.json);\n\n  // If item has no pub date, you have two options:\n  // Option 1 (safe): treat as NOT new and drop it\n  // Option 2 (permissive): treat as new and keep it\n  // I'll choose safe by default:\n  if (!pub) continue;\n\n  const isNew = !cursor || pub > cursor;\n\n  if (isNew) out.push(item);\n}\n\nreturn out;\n"
+      },
+      "id": "lc-rss-filter",
+      "name": "Filter New & Relevant",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        320
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "operation": "search",
+        "base": {
+          "__rl": true,
+          "value": "appvWjinwsRDhMlWF",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Post Copilot",
+          "cachedResultUrl": "https://airtable.com/appvWjinwsRDhMlWF"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblUupIRZQpiSFbCk",
+          "mode": "list",
+          "cachedResultName": "Posts",
+          "cachedResultUrl": "https://airtable.com/appvWjinwsRDhMlWF/tblUupIRZQpiSFbCk"
+        },
+        "filterByFormula": "={Attachments} = \"{{ $json.link }}\"",
+        "options": {}
+      },
+      "id": "lc-rss-check-dedup",
+      "name": "Check If Exists",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [
+        1344,
+        256
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "meUymQhIYdbiv1Zh",
+          "name": "LinkedIn Posting Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "rss-dup-check",
+              "leftValue": "={{$('Filter New & Relevant').item.json.link }}",
+              "rightValue": true,
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "lc-rss-not-dup",
+      "name": "Not Already Captured?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1568,
+        256
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "base": {
+          "__rl": true,
+          "value": "appvWjinwsRDhMlWF",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Post Copilot",
+          "cachedResultUrl": "https://airtable.com/appvWjinwsRDhMlWF"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblUupIRZQpiSFbCk",
+          "mode": "list",
+          "cachedResultName": "Posts",
+          "cachedResultUrl": "https://airtable.com/appvWjinwsRDhMlWF/tblUupIRZQpiSFbCk"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Title": "={{ $('Filter New & Relevant').item.json.title }}",
+            "Pillar": "Tech Updates",
+            "Attachments": "={{ $('Filter New & Relevant').item.json.link }}",
+            "Workflow Status": "Beginning"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Title",
+              "displayName": "Title",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Pillar",
+              "displayName": "Pillar",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "GTM Engineering",
+                  "value": "GTM Engineering"
+                },
+                {
+                  "name": "Personal Projects",
+                  "value": "Personal Projects"
+                },
+                {
+                  "name": "Tech Updates",
+                  "value": "Tech Updates"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Post Body",
+              "displayName": "Post Body",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Attachments",
+              "displayName": "Attachments",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Workflow Status",
+              "displayName": "Workflow Status",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "Beginning",
+                  "value": "Beginning"
+                },
+                {
+                  "name": "Queued",
+                  "value": "Queued"
+                },
+                {
+                  "name": "Processing",
+                  "value": "Processing"
+                },
+                {
+                  "name": "Awaiting Approval",
+                  "value": "Awaiting Approval"
+                },
+                {
+                  "name": "Approved",
+                  "value": "Approved"
+                },
+                {
+                  "name": "Failed",
+                  "value": "Failed"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Notes",
+              "displayName": "Notes",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Review Status",
+              "displayName": "Review Status",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Last Modified Time",
+              "displayName": "Last Modified Time",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": true
+            },
+            {
+              "id": "Scheduled Date",
+              "displayName": "Scheduled Date",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Published Date",
+              "displayName": "Published Date",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Voice Pack",
+              "displayName": "Voice Pack",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Content Source",
+              "displayName": "Content Source",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Draft Text",
+              "displayName": "Draft Text",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "QA Pass",
+              "displayName": "QA Pass",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "QA Issues",
+              "displayName": "QA Issues",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "RunID",
+              "displayName": "RunID",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Last Step",
+              "displayName": "Last Step",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Last Error",
+              "displayName": "Last Error",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Voice Context",
+              "displayName": "Voice Context",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Scaffold",
+              "displayName": "Scaffold",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Key Points",
+              "displayName": "Key Points",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "id": "lc-rss-create-post",
+      "name": "Create Post Record",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [
+        1792,
+        176
+      ],
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "meUymQhIYdbiv1Zh",
+          "name": "LinkedIn Posting Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "base": {
+          "__rl": true,
+          "value": "appvWjinwsRDhMlWF",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Post Copilot",
+          "cachedResultUrl": "https://airtable.com/appvWjinwsRDhMlWF"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblLSUtjPhFe2pe1J",
+          "mode": "list",
+          "cachedResultName": "RSS_Sources",
+          "cachedResultUrl": "https://airtable.com/appvWjinwsRDhMlWF/tblLSUtjPhFe2pe1J"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $('Get Active Feeds').item.json.id }}",
+            "Last Item Published At": "={{ $('Daily Check').item.json.timestamp }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": false
+            },
+            {
+              "id": "Source Name",
+              "displayName": "Source Name",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "RSS Feed URL",
+              "displayName": "RSS Feed URL",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Content Type",
+              "displayName": "Content Type",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "Blog",
+                  "value": "Blog"
+                },
+                {
+                  "name": "News",
+                  "value": "News"
+                },
+                {
+                  "name": "Podcast",
+                  "value": "Podcast"
+                },
+                {
+                  "name": "YouTube",
+                  "value": "YouTube"
+                },
+                {
+                  "name": "Other",
+                  "value": "Other"
+                }
+              ],
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Default Voice Pack",
+              "displayName": "Default Voice Pack",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Associated Projects",
+              "displayName": "Associated Projects",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Notes",
+              "displayName": "Notes",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Posts",
+              "displayName": "Posts",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Active",
+              "displayName": "Active",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Last Item Published At",
+              "displayName": "Last Item Published At",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "id": "lc-rss-update-ts",
+      "name": "Update Feed Timestamp",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [
+        2016,
+        400
+      ],
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "meUymQhIYdbiv1Zh",
+          "name": "LinkedIn Posting Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## LC-RSS-Triage\n\n**Purpose**: Poll RSS feeds every 2 hours, filter for relevance, create intake records\n\n**Default RSS feeds to add to Airtable RSS_Sources table**:\n- TechCrunch AI: https://techcrunch.com/category/artificial-intelligence/feed/\n- Hacker News (best): https://hnrss.org/best\n- The Verge Tech: https://www.theverge.com/rss/tech/index.xml\n- Product Hunt: https://www.producthunt.com/feed\n\n**Setup**: Replace PLACEHOLDER IDs with your Airtable base/table IDs",
+        "height": 528
+      },
+      "id": "lc-rss-sticky",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -288,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "lc-rss-loop",
+      "name": "Loop Each Feed",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        448,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "b3f1a2c4-d5e6-4f78-9abc-def012345678",
+              "leftValue": "={{ $json.pubDate }}",
+              "rightValue": true,
+              "operator": {
+                "type": "dateTime",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "lc-rss-has-items",
+      "name": "Has New Items?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1120,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {}
+          ]
+        }
+      },
+      "id": "lc-rss-schedule",
+      "name": "Daily Check",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        400
+      ]
+    }
+  ],
+  "connections": {
+    "Get Active Feeds": {
+      "main": [
+        [
+          {
+            "node": "Loop Each Feed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read RSS Feed": {
+      "main": [
+        [
+          {
+            "node": "Filter New & Relevant",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check If Exists": {
+      "main": [
+        [
+          {
+            "node": "Not Already Captured?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Not Already Captured?": {
+      "main": [
+        [
+          {
+            "node": "Create Post Record",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update Feed Timestamp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Post Record": {
+      "main": [
+        [
+          {
+            "node": "Update Feed Timestamp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Feed Timestamp": {
+      "main": [
+        [
+          {
+            "node": "Loop Each Feed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Each Feed": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Read RSS Feed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter New & Relevant": {
+      "main": [
+        [
+          {
+            "node": "Has New Items?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has New Items?": {
+      "main": [
+        [
+          {
+            "node": "Check If Exists",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update Feed Timestamp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Daily Check": {
+      "main": [
+        [
+          {
+            "node": "Get Active Feeds",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": {
+    "node:Daily Check": {
+      "recurrenceRules": []
+    }
+  },
+  "meta": null,
+  "pinData": {},
+  "versionId": "c19b0cf4-f6ee-47ee-99a3-51ab0315637d",
+  "activeVersionId": "c19b0cf4-f6ee-47ee-99a3-51ab0315637d",
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-01-31T19:03:53.908Z",
+      "createdAt": "2026-01-31T19:03:53.908Z",
+      "role": "workflow:owner",
+      "workflowId": "kzzQuBk8ruxUDWZy",
+      "projectId": "JXFm39uiH4OT7tOz"
+    }
+  ],
+  "activeVersion": {
+    "updatedAt": "2026-02-18T18:05:26.034Z",
+    "createdAt": "2026-02-18T18:05:26.034Z",
+    "versionId": "c19b0cf4-f6ee-47ee-99a3-51ab0315637d",
+    "workflowId": "kzzQuBk8ruxUDWZy",
+    "nodes": [
+      {
+        "parameters": {
+          "operation": "search",
+          "base": {
+            "__rl": true,
+            "value": "appvWjinwsRDhMlWF",
+            "mode": "list",
+            "cachedResultName": "LinkedIn Post Copilot",
+            "cachedResultUrl": "https://airtable.com/appvWjinwsRDhMlWF"
+          },
+          "table": {
+            "__rl": true,
+            "value": "tblLSUtjPhFe2pe1J",
+            "mode": "list",
+            "cachedResultName": "RSS_Sources",
+            "cachedResultUrl": "https://airtable.com/appvWjinwsRDhMlWF/tblLSUtjPhFe2pe1J"
+          },
+          "filterByFormula": "={active} = TRUE()",
+          "options": {}
+        },
+        "id": "lc-rss-get-feeds",
+        "name": "Get Active Feeds",
+        "type": "n8n-nodes-base.airtable",
+        "typeVersion": 2,
+        "position": [
+          224,
+          400
+        ],
+        "credentials": {
+          "airtableTokenApi": {
+            "id": "meUymQhIYdbiv1Zh",
+            "name": "LinkedIn Posting Token"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "url": "={{ $json['RSS Feed URL'] }}",
+          "options": {}
+        },
+        "id": "lc-rss-read",
+        "name": "Read RSS Feed",
+        "type": "n8n-nodes-base.rssFeedRead",
+        "typeVersion": 1,
+        "position": [
+          672,
+          320
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "// n8n Code node: Filter New (and optionally relevance later)\n\n// 1) Pull the feed cursor (Last Item Published At) from the current feed record\n// Depending on node output, it may be at $json.fields['Last Item Published At'] or $json['Last Item Published At']\nconst feed = $('Loop Each Feed').first().json;\nconst cursorRaw =\n  feed?.fields?.['Last Item Published At'] ??\n  feed?.['Last Item Published At'] ??\n  null;\n\n// Airtable Date field usually comes through as ISO string. If empty, treat as null.\nconst cursor = cursorRaw ? new Date(cursorRaw) : null;\n\n// 2) Helper to parse RSS pubDate variants\nfunction parsePubDate(itemJson) {\n  const raw =\n    itemJson.pubDate ??\n    itemJson.isoDate ??\n    itemJson.published ??\n    itemJson.date ??\n    null;\n\n  if (!raw) return null;\n\n  const d = new Date(raw);\n  return isNaN(d.getTime()) ? null : d;\n}\n\n// 3) Filter: if no cursor, treat all as new. Else only keep pubDate > cursor.\nconst out = [];\n\nfor (const item of $input.all()) {\n  const pub = parsePubDate(item.json);\n\n  // If item has no pub date, you have two options:\n  // Option 1 (safe): treat as NOT new and drop it\n  // Option 2 (permissive): treat as new and keep it\n  // I'll choose safe by default:\n  if (!pub) continue;\n\n  const isNew = !cursor || pub > cursor;\n\n  if (isNew) out.push(item);\n}\n\nreturn out;\n"
+        },
+        "id": "lc-rss-filter",
+        "name": "Filter New & Relevant",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          896,
+          320
+        ],
+        "alwaysOutputData": true
+      },
+      {
+        "parameters": {
+          "operation": "search",
+          "base": {
+            "__rl": true,
+            "value": "appvWjinwsRDhMlWF",
+            "mode": "list",
+            "cachedResultName": "LinkedIn Post Copilot",
+            "cachedResultUrl": "https://airtable.com/appvWjinwsRDhMlWF"
+          },
+          "table": {
+            "__rl": true,
+            "value": "tblUupIRZQpiSFbCk",
+            "mode": "list",
+            "cachedResultName": "Posts",
+            "cachedResultUrl": "https://airtable.com/appvWjinwsRDhMlWF/tblUupIRZQpiSFbCk"
+          },
+          "filterByFormula": "={Attachments} = \"{{ $json.link }}\"",
+          "options": {}
+        },
+        "id": "lc-rss-check-dedup",
+        "name": "Check If Exists",
+        "type": "n8n-nodes-base.airtable",
+        "typeVersion": 2,
+        "position": [
+          1344,
+          256
+        ],
+        "alwaysOutputData": true,
+        "credentials": {
+          "airtableTokenApi": {
+            "id": "meUymQhIYdbiv1Zh",
+            "name": "LinkedIn Posting Token"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict",
+              "version": 1
+            },
+            "conditions": [
+              {
+                "id": "rss-dup-check",
+                "leftValue": "={{$('Filter New & Relevant').item.json.link }}",
+                "rightValue": true,
+                "operator": {
+                  "type": "string",
+                  "operation": "exists",
+                  "singleValue": true
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "id": "lc-rss-not-dup",
+        "name": "Not Already Captured?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2,
+        "position": [
+          1568,
+          256
+        ]
+      },
+      {
+        "parameters": {
+          "operation": "create",
+          "base": {
+            "__rl": true,
+            "value": "appvWjinwsRDhMlWF",
+            "mode": "list",
+            "cachedResultName": "LinkedIn Post Copilot",
+            "cachedResultUrl": "https://airtable.com/appvWjinwsRDhMlWF"
+          },
+          "table": {
+            "__rl": true,
+            "value": "tblUupIRZQpiSFbCk",
+            "mode": "list",
+            "cachedResultName": "Posts",
+            "cachedResultUrl": "https://airtable.com/appvWjinwsRDhMlWF/tblUupIRZQpiSFbCk"
+          },
+          "columns": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "Title": "={{ $('Filter New & Relevant').item.json.title }}",
+              "Pillar": "Tech Updates",
+              "Attachments": "={{ $('Filter New & Relevant').item.json.link }}",
+              "Workflow Status": "Beginning"
+            },
+            "matchingColumns": [],
+            "schema": [
+              {
+                "id": "Title",
+                "displayName": "Title",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": false
+              },
+              {
+                "id": "Pillar",
+                "displayName": "Pillar",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "options",
+                "options": [
+                  {
+                    "name": "GTM Engineering",
+                    "value": "GTM Engineering"
+                  },
+                  {
+                    "name": "Personal Projects",
+                    "value": "Personal Projects"
+                  },
+                  {
+                    "name": "Tech Updates",
+                    "value": "Tech Updates"
+                  }
+                ],
+                "readOnly": false,
+                "removed": false
+              },
+              {
+                "id": "Post Body",
+                "displayName": "Post Body",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Attachments",
+                "displayName": "Attachments",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": false
+              },
+              {
+                "id": "Workflow Status",
+                "displayName": "Workflow Status",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "options",
+                "options": [
+                  {
+                    "name": "Beginning",
+                    "value": "Beginning"
+                  },
+                  {
+                    "name": "Queued",
+                    "value": "Queued"
+                  },
+                  {
+                    "name": "Processing",
+                    "value": "Processing"
+                  },
+                  {
+                    "name": "Awaiting Approval",
+                    "value": "Awaiting Approval"
+                  },
+                  {
+                    "name": "Approved",
+                    "value": "Approved"
+                  },
+                  {
+                    "name": "Failed",
+                    "value": "Failed"
+                  }
+                ],
+                "readOnly": false,
+                "removed": false
+              },
+              {
+                "id": "Notes",
+                "displayName": "Notes",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Review Status",
+                "displayName": "Review Status",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "boolean",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Last Modified Time",
+                "displayName": "Last Modified Time",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": true,
+                "removed": true
+              },
+              {
+                "id": "Scheduled Date",
+                "displayName": "Scheduled Date",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "dateTime",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Published Date",
+                "displayName": "Published Date",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "dateTime",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Voice Pack",
+                "displayName": "Voice Pack",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "array",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Content Source",
+                "displayName": "Content Source",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "array",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Draft Text",
+                "displayName": "Draft Text",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "QA Pass",
+                "displayName": "QA Pass",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "boolean",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "QA Issues",
+                "displayName": "QA Issues",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "RunID",
+                "displayName": "RunID",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Last Step",
+                "displayName": "Last Step",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Last Error",
+                "displayName": "Last Error",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Voice Context",
+                "displayName": "Voice Context",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Scaffold",
+                "displayName": "Scaffold",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Key Points",
+                "displayName": "Key Points",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              }
+            ],
+            "attemptToConvertTypes": false,
+            "convertFieldsToString": true
+          },
+          "options": {}
+        },
+        "id": "lc-rss-create-post",
+        "name": "Create Post Record",
+        "type": "n8n-nodes-base.airtable",
+        "typeVersion": 2,
+        "position": [
+          1792,
+          176
+        ],
+        "credentials": {
+          "airtableTokenApi": {
+            "id": "meUymQhIYdbiv1Zh",
+            "name": "LinkedIn Posting Token"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "operation": "update",
+          "base": {
+            "__rl": true,
+            "value": "appvWjinwsRDhMlWF",
+            "mode": "list",
+            "cachedResultName": "LinkedIn Post Copilot",
+            "cachedResultUrl": "https://airtable.com/appvWjinwsRDhMlWF"
+          },
+          "table": {
+            "__rl": true,
+            "value": "tblLSUtjPhFe2pe1J",
+            "mode": "list",
+            "cachedResultName": "RSS_Sources",
+            "cachedResultUrl": "https://airtable.com/appvWjinwsRDhMlWF/tblLSUtjPhFe2pe1J"
+          },
+          "columns": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "id": "={{ $('Get Active Feeds').item.json.id }}",
+              "Last Item Published At": "={{ $('Daily Check').item.json.timestamp }}"
+            },
+            "matchingColumns": [
+              "id"
+            ],
+            "schema": [
+              {
+                "id": "id",
+                "displayName": "id",
+                "required": false,
+                "defaultMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": true,
+                "removed": false
+              },
+              {
+                "id": "Source Name",
+                "displayName": "Source Name",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "RSS Feed URL",
+                "displayName": "RSS Feed URL",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Content Type",
+                "displayName": "Content Type",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "options",
+                "options": [
+                  {
+                    "name": "Blog",
+                    "value": "Blog"
+                  },
+                  {
+                    "name": "News",
+                    "value": "News"
+                  },
+                  {
+                    "name": "Podcast",
+                    "value": "Podcast"
+                  },
+                  {
+                    "name": "YouTube",
+                    "value": "YouTube"
+                  },
+                  {
+                    "name": "Other",
+                    "value": "Other"
+                  }
+                ],
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Default Voice Pack",
+                "displayName": "Default Voice Pack",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "array",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Associated Projects",
+                "displayName": "Associated Projects",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Notes",
+                "displayName": "Notes",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Posts",
+                "displayName": "Posts",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "array",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Active",
+                "displayName": "Active",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "boolean",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Last Item Published At",
+                "displayName": "Last Item Published At",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "dateTime",
+                "readOnly": false,
+                "removed": false
+              }
+            ],
+            "attemptToConvertTypes": false,
+            "convertFieldsToString": true
+          },
+          "options": {}
+        },
+        "id": "lc-rss-update-ts",
+        "name": "Update Feed Timestamp",
+        "type": "n8n-nodes-base.airtable",
+        "typeVersion": 2,
+        "position": [
+          2016,
+          400
+        ],
+        "credentials": {
+          "airtableTokenApi": {
+            "id": "meUymQhIYdbiv1Zh",
+            "name": "LinkedIn Posting Token"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "content": "## LC-RSS-Triage\n\n**Purpose**: Poll RSS feeds every 2 hours, filter for relevance, create intake records\n\n**Default RSS feeds to add to Airtable RSS_Sources table**:\n- TechCrunch AI: https://techcrunch.com/category/artificial-intelligence/feed/\n- Hacker News (best): https://hnrss.org/best\n- The Verge Tech: https://www.theverge.com/rss/tech/index.xml\n- Product Hunt: https://www.producthunt.com/feed\n\n**Setup**: Replace PLACEHOLDER IDs with your Airtable base/table IDs",
+          "height": 528
+        },
+        "id": "lc-rss-sticky",
+        "name": "Sticky Note",
+        "type": "n8n-nodes-base.stickyNote",
+        "typeVersion": 1,
+        "position": [
+          -288,
+          80
+        ]
+      },
+      {
+        "parameters": {
+          "options": {}
+        },
+        "id": "lc-rss-loop",
+        "name": "Loop Each Feed",
+        "type": "n8n-nodes-base.splitInBatches",
+        "typeVersion": 3,
+        "position": [
+          448,
+          400
+        ]
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "version": 2,
+              "leftValue": "",
+              "caseSensitive": true,
+              "typeValidation": "strict"
+            },
+            "conditions": [
+              {
+                "id": "b3f1a2c4-d5e6-4f78-9abc-def012345678",
+                "leftValue": "={{ $json.pubDate }}",
+                "rightValue": true,
+                "operator": {
+                  "type": "dateTime",
+                  "operation": "exists",
+                  "singleValue": true
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "id": "lc-rss-has-items",
+        "name": "Has New Items?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.2,
+        "position": [
+          1120,
+          320
+        ]
+      },
+      {
+        "parameters": {
+          "rule": {
+            "interval": [
+              {}
+            ]
+          }
+        },
+        "id": "lc-rss-schedule",
+        "name": "Daily Check",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.2,
+        "position": [
+          0,
+          400
+        ]
+      }
+    ],
+    "connections": {
+      "Get Active Feeds": {
+        "main": [
+          [
+            {
+              "node": "Loop Each Feed",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Read RSS Feed": {
+        "main": [
+          [
+            {
+              "node": "Filter New & Relevant",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Check If Exists": {
+        "main": [
+          [
+            {
+              "node": "Not Already Captured?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Not Already Captured?": {
+        "main": [
+          [
+            {
+              "node": "Create Post Record",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Update Feed Timestamp",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Create Post Record": {
+        "main": [
+          [
+            {
+              "node": "Update Feed Timestamp",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Update Feed Timestamp": {
+        "main": [
+          [
+            {
+              "node": "Loop Each Feed",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Loop Each Feed": {
+        "main": [
+          [],
+          [
+            {
+              "node": "Read RSS Feed",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Filter New & Relevant": {
+        "main": [
+          [
+            {
+              "node": "Has New Items?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Has New Items?": {
+        "main": [
+          [
+            {
+              "node": "Check If Exists",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Update Feed Timestamp",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Daily Check": {
+        "main": [
+          [
+            {
+              "node": "Get Active Feeds",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Brian Joseph",
+    "name": null,
+    "description": null
+  },
+  "tags": [
+    {
+      "updatedAt": "2026-02-18T18:04:30.191Z",
+      "createdAt": "2026-02-18T18:04:30.191Z",
+      "id": "0qJQZcw3hY0HqZvd",
+      "name": "LinkedInPoster"
+    }
+  ],
+  "targetRepo": "LinkedIn-Poster"
+}
