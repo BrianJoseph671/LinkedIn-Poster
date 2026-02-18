@@ -1,0 +1,4204 @@
+{
+  "updatedAt": "2026-02-18T18:05:14.614Z",
+  "createdAt": "2026-01-31T19:03:09.337Z",
+  "id": "ODfrFYwgROdu7EKM",
+  "name": "WF2: Draft-Polish Engine",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "search",
+        "base": {
+          "__rl": true,
+          "value": "appvWjinwsRDhMlWF",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Post Copilot",
+          "cachedResultUrl": "https://airtable.com/appvWjinwsRDhMlWF"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblvtKDSLN8QcqIFw",
+          "mode": "list",
+          "cachedResultName": "Voice_Pack",
+          "cachedResultUrl": "https://airtable.com/appvWjinwsRDhMlWF/tblvtKDSLN8QcqIFw"
+        },
+        "filterByFormula": "=AND(\n  {active}=TRUE(),\n  OR(\n    FIND(\"All\", ARRAYJOIN({applies_to})),\n    FIND(\"{{ $('Guard & Generate Run ID (Prevents Reruns if error)').first().json.content_pillar }}\", ARRAYJOIN({applies_to}))\n  )\n)",
+        "options": {},
+        "sort": {
+          "property": [
+            {
+              "field": "priority"
+            }
+          ]
+        }
+      },
+      "id": "lc-dp-fetch-voice",
+      "name": "Fetch Voice Pack",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [
+        896,
+        672
+      ],
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "meUymQhIYdbiv1Zh",
+          "name": "LinkedIn Posting Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const post = $('Guard & Generate Run ID (Prevents Reruns if error)').first().json;\nconst voiceRecords = $('Fetch Voice Pack').all().map(i => i.json);\n\nconst voiceInstructions = voiceRecords\n  .sort((a, b) => (a.priority || a.Priority || 99) - (b.priority || b.Priority || 99))\n  .map(r => {\n    const t = r.example_type || r['Example Type'] || 'Rule';\n    const txt = r.example_text || r['Example Text'] || '';\n    return `[${t}]\\n${txt}`;\n  })\n  .join('\\n\\n');\n\nreturn [{\n  json: {\n    record_id: post.record_id,\n    _run_id: post._run_id,\n    _last_step: 'voice_context',\n    intake_type: post.intake_type,\n    content_pillar: post.content_pillar,\n    source_url: post.source_url,\n    source_text: post.source_text,\n    my_take: post.my_take,\n    title: post.title,\n    voice_context: voiceInstructions || 'Write conversationally. Short sentences. NEVER use em dashes.'\n  }\n}];"
+      },
+      "id": "lc-dp-build-voice",
+      "name": "Build Voice Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        672
+      ]
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-5.2",
+          "mode": "list",
+          "cachedResultName": "GPT-5.2"
+        },
+        "responses": {
+          "values": [
+            {
+              "role": "system",
+              "content": "You are an expert Content Strategist specializing in B2B LinkedIn growth. \n\nGOAL:\nExtract high-signal insights from raw content to prepare for LinkedIn drafting. \n\nCONSTRAINTS:\n1. NEVER use em dashes (—) in any part of your output. Use commas, colons, or periods instead.\n2. Return valid JSON only.\n3. Adapt your extraction style based on the provided INTAKE TYPE:\n   - 'YouTube/Vibe': Focus on timestamps, spoken \"aha\" moments, and conversational hooks.\n   - 'Repost with Take': Focus on the contrast between the source text and the user's personal 'take'.\n   - 'Tech News': Focus on business impact, stats, and \"why this matters now.\"\n\nFORMAT:\nYou must output a JSON object with these keys:\n{\n  \"hook_ideas\": [\"3 options for the opening line\"],\n  \"key_insights\": [\"3 punchy bullet points\"],\n  \"suggested_cta\": \"A call to action that fits the content pillar\"\n}"
+            },
+            {
+              "content": "=CONTENT PILLAR: {{ $('Build Voice Context').item.json.content_pillar }}\nINTAKE TYPE: {{ $('Build Voice Context').item.json.intake_type }}\n\nSOURCE TEXT: \n{{ $('Build Voice Context').item.json.source_text }}\n\nMY TAKE/NOTES:\n{{ $('Build Voice Context').item.json.my_take }}\n\nVOICE INSTRUCTIONS:\n{{ $('Build Voice Context').item.json.voice_context }}\n\nINSTRUCTIONS:\nYou are an expert content strategist. Based on the INTAKE TYPE above, extract 3-5 key insights. \n- If the type is 'YouTube/Vibe', focus on the narrative flow and unique quotes.\n- If the type is 'Repost with Take', highlight the tension between the source and 'MY TAKE'.\n- If the type is 'Tech News', focus on the objective impact of the news."
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {
+          "temperature": 0.3
+        }
+      },
+      "id": "lc-dp-extract-kp",
+      "name": "Extract Key Points",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.1,
+      "position": [
+        1344,
+        672
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "lkCgV0rIGVDbl0Jd",
+          "name": "OpenAi account 4"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nconst context = $('Build Voice Context').first().json;\n\nconst raw = response.output?.[0]?.content?.[0]?.text || response.message?.content || JSON.stringify(response);\n\nlet parsed;\ntry {\n  const jsonStr = raw.replace(/```json\\n?/g, '').replace(/```/g, '').trim();\n  parsed = JSON.parse(jsonStr);\n} catch (e) {\n  return [{\n    json: {\n      ...context,\n      _last_step: 'key_points',\n      key_points: JSON.stringify({ key_points: [{ insight: raw.substring(0, 500), why_it_matters: 'Parse failed', hook_angle: 'N/A' }], recommended_tone: 'practical' }),\n      parse_error: e.message\n    }\n  }];\n}\n\nreturn [{\n  json: {\n    ...context,\n    _last_step: 'key_points',\n    key_points: JSON.stringify(parsed)\n  }\n}];"
+      },
+      "id": "lc-dp-parse-kp",
+      "name": "Parse Key Points",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1696,
+        592
+      ]
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-5.2",
+          "mode": "list",
+          "cachedResultName": "GPT-5.2"
+        },
+        "responses": {
+          "values": [
+            {
+              "role": "system",
+              "content": "You are a senior GTM Strategist and Research Analyst. Your goal is to transform raw insights into a sophisticated \"Research Scaffold\" that serves as the backbone for a high-performing LinkedIn post.\n\nSTRATEGIC DIRECTIVES:\n1. THE \"SO WHAT?\": Do not state the obvious. Find the non-obvious business implication or the efficiency gain that a GTM leader would care about.\n2. DATA OVER DECORATION: When suggesting data points, prioritize metrics, conversion rates, or specific technical shifts in the GTM stack.\n3. CONTRARIAN THINKING: Avoid \"best practices\" that everyone already knows. Challenge the status quo with logic.\n4. TONE: Professional, analytical, and slightly provocative. \n\nCONSTRAINTS:\n- NEVER use em dashes (—). Use periods or colons.\n- Return valid JSON only. No conversational preamble.\n- Ensure the \"Suggested Structure\" aligns with the CONTENT PILLAR provided."
+            },
+            {
+              "content": "=KEY POINTS:\n{{ $json.key_points }}\n\nCONTENT PILLAR: {{ $json.content_pillar }}\nORIGINAL TAKE: {{ $json.my_take }}\n\nProduce a research scaffold:\n1. Recommended angle (what's the \"so what?\")\n2. 2-3 data points or examples to reference (flag if hypothetical)\n3. One contrarian or unexpected take\n4. Suggested structure (hook type, body flow, CTA type)\n\nReturn JSON:\n{\n  \"angle\": \"...\",\n  \"data_points\": [\"...\"],\n  \"contrarian_take\": \"...\",\n  \"structure\": { \"hook_type\": \"...\", \"body_flow\": \"...\", \"cta_type\": \"...\" }\n}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {
+          "temperature": 0.4
+        }
+      },
+      "id": "lc-dp-research",
+      "name": "Research Scaffold",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.1,
+      "position": [
+        1920,
+        592
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "lkCgV0rIGVDbl0Jd",
+          "name": "OpenAi account 4"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nconst context = $('Parse Key Points').first().json;\n\nconst raw = response.output?.[0]?.content?.[0]?.text || response.message?.content || JSON.stringify(response);\n\nlet parsed;\ntry {\n  const jsonStr = raw.replace(/```json\\n?/g, '').replace(/```/g, '').trim();\n  parsed = JSON.parse(jsonStr);\n} catch (e) {\n  parsed = { angle: raw.substring(0, 300), data_points: [], contrarian_take: '', structure: {} };\n}\n\nreturn [{\n  json: {\n    ...context,\n    _last_step: 'scaffold',\n    research_scaffold: JSON.stringify(parsed)\n  }\n}];"
+      },
+      "id": "lc-dp-parse-scaffold",
+      "name": "Parse Scaffold",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2272,
+        528
+      ]
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-5.2",
+          "mode": "list",
+          "cachedResultName": "GPT-5.2"
+        },
+        "responses": {
+          "values": [
+            {
+              "role": "system",
+              "content": "=You are the elite ghostwriter for Brian Joseph, a GTM Engineer and Founder. \n\nMISSION:\nTransform strategic research into high-impact LinkedIn content that establishes Brian as a technical yet business-savvy authority in Go-To-Market engineering.\n\nIDENTITY & TONE:\n- You are a builder, not a theorist. Speak from the perspective of someone who sees the code and the revenue spreadsheet at the same time.\n- Tone is \"High Signal, Low Noise\": Efficient, punchy, and slightly opinionated. \n- Avoid \"Consultant Speak\" (e.g., \"In today's fast-paced world,\" \"It's vital to remember\").\n\nVOICE CONSTRAINTS (MANDATORY):\n- {{ $json.voice_context }}\n- NEVER use em dashes (—). This is a hard constraint for Brian's visual style.\n- Use line breaks for readability, but keep the flow logical.\n\nOUTPUT:\nReturn the final post text only. No conversational filler."
+            },
+            {
+              "content": "=KEY POINTS:\n{{ $json.key_points }}\n\nRESEARCH SCAFFOLD:\n{{ $json.research_scaffold }}\n\nORIGINAL TAKE: {{ $json.my_take }}\nSOURCE URL: {{ $json.source_url }}\n\nWrite a LinkedIn post (150-350 words):\n- Hook in the first line (no generic openings like \"I've been thinking...\")\n- Short paragraphs (1-3 sentences max)\n- Clear takeaway or question at the end to drive engagement\n- NEVER use em dashes, only hyphens, commas, periods, or semicolons\n- No hashtags, minimal emojis\n- Match Brian's voice exactly from the style rules above\n\nReturn ONLY the post text. No metadata, no explanations, no prefix."
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {
+          "temperature": 0.7
+        }
+      },
+      "id": "lc-dp-draft",
+      "name": "Draft in Voice",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.1,
+      "position": [
+        2496,
+        528
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "lkCgV0rIGVDbl0Jd",
+          "name": "OpenAi account 4"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nconst context = $('Parse Scaffold').first().json;\n\nconst rawDraft = response.output?.[0]?.content?.[0]?.text\n  || response.message?.content\n  || JSON.stringify(response);\n\nconst flags = [];\n\nif (rawDraft.includes('\\u2014') || rawDraft.includes('\\u2013')) {\n  const count = (rawDraft.match(/[\\u2014\\u2013]/g) || []).length;\n  flags.push(`Em dash detected (${count} found) - auto-replaced`);\n}\n\nlet draft = rawDraft.replace(/[\\u2014\\u2013]/g, ' - ');\n\nconst words = draft.split(/\\s+/).filter(w => w.length > 0).length;\nif (words > 400) flags.push(`Too long: ${words} words (target: 150-350)`);\nif (words < 80) flags.push(`Too short: ${words} words (target: 150-350)`);\n\nconst vagueWords = ['leverage', 'synergy', 'utilize', 'paradigm', 'ecosystem', 'disrupt'];\nvagueWords.forEach(w => {\n  if (draft.toLowerCase().includes(w)) flags.push(`Vague buzzword: \"${w}\"`);\n});\n\nconst cringePatterns = ['game-changer', 'thought leader', 'crushing it', 'let that sink in'];\ncringePatterns.forEach(p => {\n  if (draft.toLowerCase().includes(p)) flags.push(`Cringe pattern: \"${p}\"`);\n});\n\nconst genericOpeners = [\"i've been thinking\", \"let me tell you\", \"here's the thing\", \"hot take\", \"unpopular opinion\"];\nconst hasGeneric = genericOpeners.some(o => draft.toLowerCase().trim().startsWith(o));\nif (hasGeneric) flags.push('Generic opening detected - consider rewriting hook');\n\nif (/\\d+%|\\d+x|million|billion/gi.test(draft)) {\n  flags.push('Contains statistics - verify sources before posting');\n}\n\nreturn [{\n  json: {\n    record_id: context.record_id,\n    _run_id: context._run_id,\n    _last_step: 'qa',\n    content_pillar: context.content_pillar,\n    source_url: context.source_url,\n    my_take: context.my_take,\n    voice_context: context.voice_context,\n    key_points: context.key_points,\n    research_scaffold: context.research_scaffold,\n    draft_text: draft,\n    qa_pass: flags.length === 0,\n    qa_issues: JSON.stringify(flags),\n    title: $('Acquire Lock (Status -> Processing)').first().json.fields.Title\n  }\n}];"
+      },
+      "id": "lc-dp-qa",
+      "name": "QA Checks",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2848,
+        448
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "base": {
+          "__rl": true,
+          "value": "appvWjinwsRDhMlWF",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Post Copilot",
+          "cachedResultUrl": "https://airtable.com/appvWjinwsRDhMlWF"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblUupIRZQpiSFbCk",
+          "mode": "list",
+          "cachedResultName": "Posts",
+          "cachedResultUrl": "https://airtable.com/appvWjinwsRDhMlWF/tblUupIRZQpiSFbCk"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $json.record_id }}",
+            "Last Step": "={{ $json._last_step }}",
+            "QA Issues": "={{ $json.qa_issues }}",
+            "QA Pass": "={{ $json.qa_pass }}",
+            "RunID": "={{ $json._run_id }}",
+            "Voice Context": "={{ $json.voice_context }}",
+            "Key Points": "={{ $json.key_points }}",
+            "Scaffold": "={{ $json.research_scaffold }}",
+            "Draft Text": "={{ $json.draft_text }}",
+            "Workflow Status": "Awaiting Approval"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true
+            },
+            {
+              "id": "Title",
+              "displayName": "Title",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Pillar",
+              "displayName": "Pillar",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "GTM Engineering",
+                  "value": "GTM Engineering"
+                },
+                {
+                  "name": "Personal Projects",
+                  "value": "Personal Projects"
+                },
+                {
+                  "name": "Tech Updates",
+                  "value": "Tech Updates"
+                }
+              ],
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Intake Type",
+              "displayName": "Intake Type",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "YouTube",
+                  "value": "YouTube"
+                },
+                {
+                  "name": "Tech News",
+                  "value": "Tech News"
+                },
+                {
+                  "name": "Repost with my take",
+                  "value": "Repost with my take"
+                }
+              ],
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Attachments",
+              "displayName": "Attachments",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Workflow Status",
+              "displayName": "Workflow Status",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "Beginning",
+                  "value": "Beginning"
+                },
+                {
+                  "name": "Queued",
+                  "value": "Queued"
+                },
+                {
+                  "name": "Processing",
+                  "value": "Processing"
+                },
+                {
+                  "name": "Awaiting Approval",
+                  "value": "Awaiting Approval"
+                },
+                {
+                  "name": "Approved",
+                  "value": "Approved"
+                },
+                {
+                  "name": "Failed",
+                  "value": "Failed"
+                },
+                {
+                  "name": "{{$json[\"Workflow Status\"]}}",
+                  "value": "{{$json[\"Workflow Status\"]}}"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Notes",
+              "displayName": "Notes",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Post Body",
+              "displayName": "Post Body",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Review Status",
+              "displayName": "Review Status",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Modified",
+              "displayName": "Modified",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": true
+            },
+            {
+              "id": "Scheduled Date",
+              "displayName": "Scheduled Date",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Published Date",
+              "displayName": "Published Date",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Voice Pack",
+              "displayName": "Voice Pack",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Content Source",
+              "displayName": "Content Source",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Draft Text",
+              "displayName": "Draft Text",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "QA Pass",
+              "displayName": "QA Pass",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "QA Issues",
+              "displayName": "QA Issues",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "RunID",
+              "displayName": "RunID",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Last Step",
+              "displayName": "Last Step",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Last Error",
+              "displayName": "Last Error",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Voice Context",
+              "displayName": "Voice Context",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Scaffold",
+              "displayName": "Scaffold",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Key Points",
+              "displayName": "Key Points",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": true,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "lc-dp-save-draft",
+      "name": "Save All Artifacts",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [
+        3072,
+        448
+      ],
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "meUymQhIYdbiv1Zh",
+          "name": "LinkedIn Posting Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const d = $('QA Checks').first().json;\nconst flags = JSON.parse(d.qa_issues || '[]');\n\nconst riskSection = flags.length > 0\n? 'RISK FLAGS:\\n' + flags.map(f => ' - ' + f).join('\\n')\n: 'RISK FLAGS: None';\n\n// Note: No indentation here ensures left-alignment in the inbox\nconst email = `LINKEDIN POST DRAFT - READY FOR REVIEW\n\n========================================\nFINAL DRAFT (copy-pasteable):\n========================================\n${d.draft_text || '[Error: Draft Text Missing]'}\n\n${riskSection}\n\n========================================\nQA PASS: ${d.qa_pass ? 'YES' : 'NO'}\nCONTENT PILLAR: ${d.content_pillar || 'Not Specified'}\nSOURCE: ${d.source_url || 'N/A'}\n========================================\n\nClick APPROVE to mark this post ready.\nClick REJECT to send back for revision.`;\n\nreturn [{ \n  json: { \n    ...d, \n    email_body: email,\n    // We explicitly create this key so the Gmail node can find it easily\n    subject_line: `Draft Review: ${d.title || 'New LinkedIn Post'}`\n  } \n}];"
+      },
+      "id": "lc-dp-format-email",
+      "name": "Format Approval Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3296,
+        448
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "sendAndWait",
+        "sendTo": "bjoseph2@nd.edu",
+        "subject": "=FOR APPROVAL: LinkedIn Post ({{ $json.subject_line }})",
+        "message": "={{ $json.email_body }}",
+        "approvalOptions": {
+          "values": {
+            "approvalType": "double"
+          }
+        },
+        "options": {
+          "limitWaitTime": {
+            "values": {
+              "resumeAmount": 720,
+              "resumeUnit": "minutes"
+            }
+          },
+          "appendAttribution": false
+        }
+      },
+      "id": "lc-dp-send-approval",
+      "name": "Send Approval Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        3520,
+        448
+      ],
+      "webhookId": "5094a963-48a9-4f4a-be80-38c17cb378da",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "RbE8KgRHxzOsSHeY",
+          "name": "Gmail account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nconst d = $('Format Approval Email').first().json;\nconst approved = response.data?.approved === true;\n\nreturn [{\n  json: {\n    record_id: d.record_id,\n    workflow_status: approved ? 'Approved' : 'Failed',\n    review_status: approved ? 'Approved' : 'Rejected',\n    draft_text: d.draft_text,\n    last_step: approved ? 'approved' : 'rejected'\n  }\n}];"
+      },
+      "id": "lc-dp-handle-response",
+      "name": "Handle Approval Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3744,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "base": {
+          "__rl": true,
+          "value": "appvWjinwsRDhMlWF",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Post Copilot",
+          "cachedResultUrl": "https://airtable.com/appvWjinwsRDhMlWF"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblUupIRZQpiSFbCk",
+          "mode": "list",
+          "cachedResultName": "Posts",
+          "cachedResultUrl": "https://airtable.com/appvWjinwsRDhMlWF/tblUupIRZQpiSFbCk"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $json.record_id }}",
+            "Workflow Status": "={{ $json.workflow_status }}",
+            "Review Status": "={{true}}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true
+            },
+            {
+              "id": "Title",
+              "displayName": "Title",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Pillar",
+              "displayName": "Pillar",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "GTM Engineering",
+                  "value": "GTM Engineering"
+                },
+                {
+                  "name": "Personal Projects",
+                  "value": "Personal Projects"
+                },
+                {
+                  "name": "Tech Updates",
+                  "value": "Tech Updates"
+                }
+              ],
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Intake Type",
+              "displayName": "Intake Type",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "YouTube",
+                  "value": "YouTube"
+                },
+                {
+                  "name": "Tech News",
+                  "value": "Tech News"
+                },
+                {
+                  "name": "Repost with my take",
+                  "value": "Repost with my take"
+                }
+              ],
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Attachments",
+              "displayName": "Attachments",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Workflow Status",
+              "displayName": "Workflow Status",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "Beginning",
+                  "value": "Beginning"
+                },
+                {
+                  "name": "Queued",
+                  "value": "Queued"
+                },
+                {
+                  "name": "Processing",
+                  "value": "Processing"
+                },
+                {
+                  "name": "Awaiting Approval",
+                  "value": "Awaiting Approval"
+                },
+                {
+                  "name": "Approved",
+                  "value": "Approved"
+                },
+                {
+                  "name": "Failed",
+                  "value": "Failed"
+                },
+                {
+                  "name": "{{$json[\"Workflow Status\"]}}",
+                  "value": "{{$json[\"Workflow Status\"]}}"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Notes",
+              "displayName": "Notes",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Post Body",
+              "displayName": "Post Body",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Review Status",
+              "displayName": "Review Status",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Modified",
+              "displayName": "Modified",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": true
+            },
+            {
+              "id": "Scheduled Date",
+              "displayName": "Scheduled Date",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Published Date",
+              "displayName": "Published Date",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Voice Pack",
+              "displayName": "Voice Pack",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Content Source",
+              "displayName": "Content Source",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Draft Text",
+              "displayName": "Draft Text",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "QA Pass",
+              "displayName": "QA Pass",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "QA Issues",
+              "displayName": "QA Issues",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "RunID",
+              "displayName": "RunID",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Last Step",
+              "displayName": "Last Step",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Last Error",
+              "displayName": "Last Error",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Voice Context",
+              "displayName": "Voice Context",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Scaffold",
+              "displayName": "Scaffold",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Key Points",
+              "displayName": "Key Points",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "id": "lc-dp-update-final",
+      "name": "Update Final Status",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [
+        3968,
+        400
+      ],
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "meUymQhIYdbiv1Zh",
+          "name": "LinkedIn Posting Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\n\nconst errorMsg = item.error?.message\n  || item.error?.description\n  || item.errorMessage\n  || 'Unknown error';\n\nconst recordId = item.record_id\n  || item._record_id\n  || '';\n\nconst lastStep = item._last_step || 'unknown';\n\nif (!recordId) {\n  try {\n    const guardData = $('Guard & Generate Run ID (Prevents Reruns if error)').first().json;\n    if (guardData && guardData.record_id) {\n      return [{\n        json: {\n          record_id: guardData.record_id,\n          workflow_status: 'Failed',\n          last_step: lastStep,\n          last_error: errorMsg.substring(0, 5000)\n        }\n      }];\n    }\n  } catch (e) {}\n  return [{\n    json: {\n      error: 'No record_id available to write error state',\n      original_error: errorMsg\n    }\n  }];\n}\n\nreturn [{\n  json: {\n    record_id: recordId,\n    workflow_status: 'Failed',\n    last_step: lastStep,\n    last_error: errorMsg.substring(0, 5000)\n  }\n}];"
+      },
+      "id": "lc-dp-handle-error",
+      "name": "Handle Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3744,
+        736
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "base": {
+          "__rl": true,
+          "value": "appvWjinwsRDhMlWF",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Post Copilot",
+          "cachedResultUrl": "https://airtable.com/appvWjinwsRDhMlWF"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblUupIRZQpiSFbCk",
+          "mode": "list",
+          "cachedResultName": "Posts",
+          "cachedResultUrl": "https://airtable.com/appvWjinwsRDhMlWF/tblUupIRZQpiSFbCk"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $json.record_id }}",
+            "Workflow Status": "Failed"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true
+            },
+            {
+              "id": "Title",
+              "displayName": "Title",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Workflow Status",
+              "displayName": "Workflow Status",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "Beginning",
+                  "value": "Beginning"
+                },
+                {
+                  "name": "Queued",
+                  "value": "Queued"
+                },
+                {
+                  "name": "Processing",
+                  "value": "Processing"
+                },
+                {
+                  "name": "Awaiting Approval",
+                  "value": "Awaiting Approval"
+                },
+                {
+                  "name": "Approved",
+                  "value": "Approved"
+                },
+                {
+                  "name": "Failed",
+                  "value": "Failed"
+                },
+                {
+                  "name": "{{$json[\"Workflow Status\"]}}",
+                  "value": "{{$json[\"Workflow Status\"]}}"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Review Status",
+              "displayName": "Review Status",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Pillar",
+              "displayName": "Pillar",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "GTM Engineering",
+                  "value": "GTM Engineering"
+                },
+                {
+                  "name": "Personal Projects",
+                  "value": "Personal Projects"
+                },
+                {
+                  "name": "Tech Updates",
+                  "value": "Tech Updates"
+                }
+              ],
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Intake Type",
+              "displayName": "Intake Type",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "YouTube",
+                  "value": "YouTube"
+                },
+                {
+                  "name": "Tech News",
+                  "value": "Tech News"
+                },
+                {
+                  "name": "Repost with my take",
+                  "value": "Repost with my take"
+                }
+              ],
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Attachments",
+              "displayName": "Attachments",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Post Body",
+              "displayName": "Post Body",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Notes",
+              "displayName": "Notes",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Modified",
+              "displayName": "Modified",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": true
+            },
+            {
+              "id": "Scheduled Date",
+              "displayName": "Scheduled Date",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Published Date",
+              "displayName": "Published Date",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Voice Pack",
+              "displayName": "Voice Pack",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Content Source",
+              "displayName": "Content Source",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Draft Text",
+              "displayName": "Draft Text",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "QA Pass",
+              "displayName": "QA Pass",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "QA Issues",
+              "displayName": "QA Issues",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "RunID",
+              "displayName": "RunID",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Last Step",
+              "displayName": "Last Step",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Last Error",
+              "displayName": "Last Error",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Voice Context",
+              "displayName": "Voice Context",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Scaffold",
+              "displayName": "Scaffold",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Key Points",
+              "displayName": "Key Points",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "id": "lc-dp-write-error",
+      "name": "Write Error to Airtable",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [
+        3968,
+        736
+      ],
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "meUymQhIYdbiv1Zh",
+          "name": "LinkedIn Posting Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## LC-Draft-Polish (State Machine)\n\n**State machine fields**: workflow_status + review_status\n**Trigger**: Airtable Trigger for records where workflow_status=Queued AND review_status=Not reviewed\n\n**Pipeline**: Guard > Lock > Voice Pack > Build Voice > Extract KP > Parse KP > Research Scaffold > Parse Scaffold > Draft in Voice > QA > Save > Email > Approve/Reject > Update Status\n\n**State transitions**:\n  Queued > Processing (lock) > Awaiting Approval (draft saved) > Approved/Queued (after email)\n  Any step > Failed (on error)\n\n**Self-retrigger prevention**: Trigger formula only matches Queued+Not reviewed.\n  WF2's own writes (Processing, Awaiting Approval, etc.) never match.\n\n**Rejection**: Sets workflow_status=Queued + review_status=Rejected.\n  Will NOT retrigger. User must manually set review_status=Not reviewed to re-draft.\n\n**Error recovery**: Set workflow_status=Failed + last_error + last_step.\n  To retry: manually set workflow_status=Queued + review_status=Not reviewed.\n\n**Artifacts persisted**: draft_text, qa_pass, qa_issues,\n  voice_context, key_points, scaffold, run_id, last_step",
+        "height": 800
+      },
+      "id": "lc-dp-sticky",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -576,
+        32
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "search",
+        "base": {
+          "__rl": true,
+          "value": "appvWjinwsRDhMlWF",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Post Copilot",
+          "cachedResultUrl": "https://airtable.com/appvWjinwsRDhMlWF"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblUupIRZQpiSFbCk",
+          "mode": "list",
+          "cachedResultName": "Posts",
+          "cachedResultUrl": "https://airtable.com/appvWjinwsRDhMlWF/tblUupIRZQpiSFbCk"
+        },
+        "filterByFormula": "{Workflow Status} = \"Queued\"",
+        "options": {}
+      },
+      "id": "lc-dp-search",
+      "name": "Find Queued Posts",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        736
+      ],
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "meUymQhIYdbiv1Zh",
+          "name": "LinkedIn Posting Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {}
+          ]
+        }
+      },
+      "id": "lc-dp-schedule",
+      "name": "Every Day",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -224,
+        736
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "bfe2ad19-4ff3-4bc0-a081-03a8ef6f2d04",
+              "name": "id",
+              "value": "={{$json.id}}",
+              "type": "string"
+            },
+            {
+              "id": "e2c3999e-2faf-437d-a53b-6db712f858fc",
+              "name": "Title",
+              "value": "={{$json.Title}}",
+              "type": "string"
+            },
+            {
+              "id": "b86063e8-fa03-4bd7-ac82-375f0bb41b2a",
+              "name": "['Voice Pack'][0]",
+              "value": "={{$json[\"Voice Pack\"] || []}}",
+              "type": "array"
+            },
+            {
+              "id": "f91dd371-86aa-41bd-93f4-b7f860e705c3",
+              "name": "['Content Source'][0]",
+              "value": "={{$json[\"Content Source\"] || []}}",
+              "type": "string"
+            },
+            {
+              "id": "d3ce6225-db6d-4d0b-9202-2709d428d854",
+              "name": "Workflow Status",
+              "value": "={{$json[\"Workflow Status\"]}}",
+              "type": "string"
+            },
+            {
+              "id": "6bbac875-32be-4ed4-9de2-3e55e6b3074f",
+              "name": "Pillar",
+              "value": "={{$json[\"Pillar\"]}}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        224,
+        736
+      ],
+      "id": "0a2014e4-f296-4e67-ab17-6c254f6ffa18",
+      "name": "JSON Data Formatting (fetch voicepack later)"
+    },
+    {
+      "parameters": {
+        "jsCode": "const post = $input.item.json;\n\n// 1. Corrected property names to match your actual data (Case & Space sensitive)\nconst workflowStatus = post['Workflow Status'];\nconst reviewStatus = post['Review Status'] || 'Not reviewed'; // Default to 'Not reviewed' if missing\n\n// 2. The Guard (Now using the correct names)\nif (workflowStatus !== 'Queued') {\n  return [];\n}\n\nconst runId = `${Date.now()}-${post.id}-${Math.random().toString(36).substring(2, 8)}`;\n\n// 3. Extract Source URL safely\nlet sourceUrl = '';\nif (post.Attachments && Array.isArray(post.Attachments) && post.Attachments.length > 0) {\n  const first = post.Attachments[0];\n  sourceUrl = typeof first === 'object' ? (first.url || '') : String(first);\n}\n\n// 4. Type Triage\nlet intakeType = 'Tech News';\nif (sourceUrl.includes('linkedin.com')) intakeType = 'Repost with Take';\nelse if (sourceUrl.includes('youtube.com') || sourceUrl.includes('youtu.be')) intakeType = 'YouTube/Vibe';\n\nreturn [{\n  json: {\n    ...post,\n    _run_id: runId,\n    _last_step: 'guard',\n    record_id: post.id,\n    content_pillar: post.Pillar || 'GTM Engineering',\n    intake_type: intakeType,\n    source_url: sourceUrl,\n    source_text: post['Post Body'] || post.Notes || post.Title || '[No source content]',\n    my_take: post.Notes || '',\n    title: post.Title || ''\n  }\n}];"
+      },
+      "id": "lc-dp-guard",
+      "name": "Guard & Generate Run ID (Prevents Reruns if error)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        736
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "base": {
+          "__rl": true,
+          "value": "appvWjinwsRDhMlWF",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Post Copilot",
+          "cachedResultUrl": "https://airtable.com/appvWjinwsRDhMlWF"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblUupIRZQpiSFbCk",
+          "mode": "list",
+          "cachedResultName": "Posts",
+          "cachedResultUrl": "https://airtable.com/appvWjinwsRDhMlWF/tblUupIRZQpiSFbCk"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $json.id }}",
+            "Workflow Status": "Processing"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": false
+            },
+            {
+              "id": "Title",
+              "displayName": "Title",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Pillar",
+              "displayName": "Pillar",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "GTM Engineering",
+                  "value": "GTM Engineering"
+                },
+                {
+                  "name": "Personal Projects",
+                  "value": "Personal Projects"
+                },
+                {
+                  "name": "Tech Updates",
+                  "value": "Tech Updates"
+                }
+              ],
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Post Body",
+              "displayName": "Post Body",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Attachments",
+              "displayName": "Attachments",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Workflow Status",
+              "displayName": "Workflow Status",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "Beginning",
+                  "value": "Beginning"
+                },
+                {
+                  "name": "Queued",
+                  "value": "Queued"
+                },
+                {
+                  "name": "Processing",
+                  "value": "Processing"
+                },
+                {
+                  "name": "Awaiting Approval",
+                  "value": "Awaiting Approval"
+                },
+                {
+                  "name": "Approved",
+                  "value": "Approved"
+                },
+                {
+                  "name": "Failed",
+                  "value": "Failed"
+                },
+                {
+                  "name": "{{$json[\"Workflow Status\"]}}",
+                  "value": "{{$json[\"Workflow Status\"]}}"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Notes",
+              "displayName": "Notes",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Review Status",
+              "displayName": "Review Status",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Modified",
+              "displayName": "Modified",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": true
+            },
+            {
+              "id": "Scheduled Date",
+              "displayName": "Scheduled Date",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Published Date",
+              "displayName": "Published Date",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Voice Pack",
+              "displayName": "Voice Pack",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Content Source",
+              "displayName": "Content Source",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Draft Text",
+              "displayName": "Draft Text",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "QA Pass",
+              "displayName": "QA Pass",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "QA Issues",
+              "displayName": "QA Issues",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "RunID",
+              "displayName": "RunID",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Last Step",
+              "displayName": "Last Step",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Last Error",
+              "displayName": "Last Error",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Voice Context",
+              "displayName": "Voice Context",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Scaffold",
+              "displayName": "Scaffold",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Key Points",
+              "displayName": "Key Points",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "lc-dp-lock",
+      "name": "Acquire Lock (Status -> Processing)",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [
+        672,
+        736
+      ],
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "meUymQhIYdbiv1Zh",
+          "name": "LinkedIn Posting Token"
+        }
+      },
+      "onError": "continueErrorOutput"
+    }
+  ],
+  "connections": {
+    "Fetch Voice Pack": {
+      "main": [
+        [
+          {
+            "node": "Build Voice Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Voice Context": {
+      "main": [
+        [
+          {
+            "node": "Extract Key Points",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Key Points": {
+      "main": [
+        [
+          {
+            "node": "Parse Key Points",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handle Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Key Points": {
+      "main": [
+        [
+          {
+            "node": "Research Scaffold",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Research Scaffold": {
+      "main": [
+        [
+          {
+            "node": "Parse Scaffold",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handle Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Scaffold": {
+      "main": [
+        [
+          {
+            "node": "Draft in Voice",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Draft in Voice": {
+      "main": [
+        [
+          {
+            "node": "QA Checks",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handle Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "QA Checks": {
+      "main": [
+        [
+          {
+            "node": "Save All Artifacts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save All Artifacts": {
+      "main": [
+        [
+          {
+            "node": "Format Approval Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Approval Email": {
+      "main": [
+        [
+          {
+            "node": "Send Approval Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Approval Email": {
+      "main": [
+        [
+          {
+            "node": "Handle Approval Response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handle Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handle Approval Response": {
+      "main": [
+        [
+          {
+            "node": "Update Final Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handle Error": {
+      "main": [
+        [
+          {
+            "node": "Write Error to Airtable",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Queued Posts": {
+      "main": [
+        [
+          {
+            "node": "JSON Data Formatting (fetch voicepack later)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Every Day": {
+      "main": [
+        [
+          {
+            "node": "Find Queued Posts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "JSON Data Formatting (fetch voicepack later)": {
+      "main": [
+        [
+          {
+            "node": "Guard & Generate Run ID (Prevents Reruns if error)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guard & Generate Run ID (Prevents Reruns if error)": {
+      "main": [
+        [
+          {
+            "node": "Acquire Lock (Status -> Processing)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Acquire Lock (Status -> Processing)": {
+      "main": [
+        [
+          {
+            "node": "Fetch Voice Pack",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handle Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "saveManualExecutions": true,
+    "saveExecutionProgress": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": true
+  },
+  "staticData": {
+    "node:Every Day": {
+      "recurrenceRules": []
+    }
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {},
+  "versionId": "15eb223e-c4fb-4518-918b-f107a83d7955",
+  "activeVersionId": "15eb223e-c4fb-4518-918b-f107a83d7955",
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-01-31T19:03:09.339Z",
+      "createdAt": "2026-01-31T19:03:09.339Z",
+      "role": "workflow:owner",
+      "workflowId": "ODfrFYwgROdu7EKM",
+      "projectId": "JXFm39uiH4OT7tOz"
+    }
+  ],
+  "activeVersion": {
+    "updatedAt": "2026-02-18T18:05:14.627Z",
+    "createdAt": "2026-02-18T18:05:14.627Z",
+    "versionId": "15eb223e-c4fb-4518-918b-f107a83d7955",
+    "workflowId": "ODfrFYwgROdu7EKM",
+    "nodes": [
+      {
+        "parameters": {
+          "operation": "search",
+          "base": {
+            "__rl": true,
+            "value": "appvWjinwsRDhMlWF",
+            "mode": "list",
+            "cachedResultName": "LinkedIn Post Copilot",
+            "cachedResultUrl": "https://airtable.com/appvWjinwsRDhMlWF"
+          },
+          "table": {
+            "__rl": true,
+            "value": "tblvtKDSLN8QcqIFw",
+            "mode": "list",
+            "cachedResultName": "Voice_Pack",
+            "cachedResultUrl": "https://airtable.com/appvWjinwsRDhMlWF/tblvtKDSLN8QcqIFw"
+          },
+          "filterByFormula": "=AND(\n  {active}=TRUE(),\n  OR(\n    FIND(\"All\", ARRAYJOIN({applies_to})),\n    FIND(\"{{ $('Guard & Generate Run ID (Prevents Reruns if error)').first().json.content_pillar }}\", ARRAYJOIN({applies_to}))\n  )\n)",
+          "options": {},
+          "sort": {
+            "property": [
+              {
+                "field": "priority"
+              }
+            ]
+          }
+        },
+        "id": "lc-dp-fetch-voice",
+        "name": "Fetch Voice Pack",
+        "type": "n8n-nodes-base.airtable",
+        "typeVersion": 2,
+        "position": [
+          896,
+          672
+        ],
+        "credentials": {
+          "airtableTokenApi": {
+            "id": "meUymQhIYdbiv1Zh",
+            "name": "LinkedIn Posting Token"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "const post = $('Guard & Generate Run ID (Prevents Reruns if error)').first().json;\nconst voiceRecords = $('Fetch Voice Pack').all().map(i => i.json);\n\nconst voiceInstructions = voiceRecords\n  .sort((a, b) => (a.priority || a.Priority || 99) - (b.priority || b.Priority || 99))\n  .map(r => {\n    const t = r.example_type || r['Example Type'] || 'Rule';\n    const txt = r.example_text || r['Example Text'] || '';\n    return `[${t}]\\n${txt}`;\n  })\n  .join('\\n\\n');\n\nreturn [{\n  json: {\n    record_id: post.record_id,\n    _run_id: post._run_id,\n    _last_step: 'voice_context',\n    intake_type: post.intake_type,\n    content_pillar: post.content_pillar,\n    source_url: post.source_url,\n    source_text: post.source_text,\n    my_take: post.my_take,\n    title: post.title,\n    voice_context: voiceInstructions || 'Write conversationally. Short sentences. NEVER use em dashes.'\n  }\n}];"
+        },
+        "id": "lc-dp-build-voice",
+        "name": "Build Voice Context",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1120,
+          672
+        ]
+      },
+      {
+        "parameters": {
+          "modelId": {
+            "__rl": true,
+            "value": "gpt-5.2",
+            "mode": "list",
+            "cachedResultName": "GPT-5.2"
+          },
+          "responses": {
+            "values": [
+              {
+                "role": "system",
+                "content": "You are an expert Content Strategist specializing in B2B LinkedIn growth. \n\nGOAL:\nExtract high-signal insights from raw content to prepare for LinkedIn drafting. \n\nCONSTRAINTS:\n1. NEVER use em dashes (—) in any part of your output. Use commas, colons, or periods instead.\n2. Return valid JSON only.\n3. Adapt your extraction style based on the provided INTAKE TYPE:\n   - 'YouTube/Vibe': Focus on timestamps, spoken \"aha\" moments, and conversational hooks.\n   - 'Repost with Take': Focus on the contrast between the source text and the user's personal 'take'.\n   - 'Tech News': Focus on business impact, stats, and \"why this matters now.\"\n\nFORMAT:\nYou must output a JSON object with these keys:\n{\n  \"hook_ideas\": [\"3 options for the opening line\"],\n  \"key_insights\": [\"3 punchy bullet points\"],\n  \"suggested_cta\": \"A call to action that fits the content pillar\"\n}"
+              },
+              {
+                "content": "=CONTENT PILLAR: {{ $('Build Voice Context').item.json.content_pillar }}\nINTAKE TYPE: {{ $('Build Voice Context').item.json.intake_type }}\n\nSOURCE TEXT: \n{{ $('Build Voice Context').item.json.source_text }}\n\nMY TAKE/NOTES:\n{{ $('Build Voice Context').item.json.my_take }}\n\nVOICE INSTRUCTIONS:\n{{ $('Build Voice Context').item.json.voice_context }}\n\nINSTRUCTIONS:\nYou are an expert content strategist. Based on the INTAKE TYPE above, extract 3-5 key insights. \n- If the type is 'YouTube/Vibe', focus on the narrative flow and unique quotes.\n- If the type is 'Repost with Take', highlight the tension between the source and 'MY TAKE'.\n- If the type is 'Tech News', focus on the objective impact of the news."
+              }
+            ]
+          },
+          "builtInTools": {},
+          "options": {
+            "temperature": 0.3
+          }
+        },
+        "id": "lc-dp-extract-kp",
+        "name": "Extract Key Points",
+        "type": "@n8n/n8n-nodes-langchain.openAi",
+        "typeVersion": 2.1,
+        "position": [
+          1344,
+          672
+        ],
+        "credentials": {
+          "openAiApi": {
+            "id": "lkCgV0rIGVDbl0Jd",
+            "name": "OpenAi account 4"
+          }
+        },
+        "onError": "continueErrorOutput"
+      },
+      {
+        "parameters": {
+          "jsCode": "const response = $input.first().json;\nconst context = $('Build Voice Context').first().json;\n\nconst raw = response.output?.[0]?.content?.[0]?.text || response.message?.content || JSON.stringify(response);\n\nlet parsed;\ntry {\n  const jsonStr = raw.replace(/```json\\n?/g, '').replace(/```/g, '').trim();\n  parsed = JSON.parse(jsonStr);\n} catch (e) {\n  return [{\n    json: {\n      ...context,\n      _last_step: 'key_points',\n      key_points: JSON.stringify({ key_points: [{ insight: raw.substring(0, 500), why_it_matters: 'Parse failed', hook_angle: 'N/A' }], recommended_tone: 'practical' }),\n      parse_error: e.message\n    }\n  }];\n}\n\nreturn [{\n  json: {\n    ...context,\n    _last_step: 'key_points',\n    key_points: JSON.stringify(parsed)\n  }\n}];"
+        },
+        "id": "lc-dp-parse-kp",
+        "name": "Parse Key Points",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1696,
+          592
+        ]
+      },
+      {
+        "parameters": {
+          "modelId": {
+            "__rl": true,
+            "value": "gpt-5.2",
+            "mode": "list",
+            "cachedResultName": "GPT-5.2"
+          },
+          "responses": {
+            "values": [
+              {
+                "role": "system",
+                "content": "You are a senior GTM Strategist and Research Analyst. Your goal is to transform raw insights into a sophisticated \"Research Scaffold\" that serves as the backbone for a high-performing LinkedIn post.\n\nSTRATEGIC DIRECTIVES:\n1. THE \"SO WHAT?\": Do not state the obvious. Find the non-obvious business implication or the efficiency gain that a GTM leader would care about.\n2. DATA OVER DECORATION: When suggesting data points, prioritize metrics, conversion rates, or specific technical shifts in the GTM stack.\n3. CONTRARIAN THINKING: Avoid \"best practices\" that everyone already knows. Challenge the status quo with logic.\n4. TONE: Professional, analytical, and slightly provocative. \n\nCONSTRAINTS:\n- NEVER use em dashes (—). Use periods or colons.\n- Return valid JSON only. No conversational preamble.\n- Ensure the \"Suggested Structure\" aligns with the CONTENT PILLAR provided."
+              },
+              {
+                "content": "=KEY POINTS:\n{{ $json.key_points }}\n\nCONTENT PILLAR: {{ $json.content_pillar }}\nORIGINAL TAKE: {{ $json.my_take }}\n\nProduce a research scaffold:\n1. Recommended angle (what's the \"so what?\")\n2. 2-3 data points or examples to reference (flag if hypothetical)\n3. One contrarian or unexpected take\n4. Suggested structure (hook type, body flow, CTA type)\n\nReturn JSON:\n{\n  \"angle\": \"...\",\n  \"data_points\": [\"...\"],\n  \"contrarian_take\": \"...\",\n  \"structure\": { \"hook_type\": \"...\", \"body_flow\": \"...\", \"cta_type\": \"...\" }\n}"
+              }
+            ]
+          },
+          "builtInTools": {},
+          "options": {
+            "temperature": 0.4
+          }
+        },
+        "id": "lc-dp-research",
+        "name": "Research Scaffold",
+        "type": "@n8n/n8n-nodes-langchain.openAi",
+        "typeVersion": 2.1,
+        "position": [
+          1920,
+          592
+        ],
+        "credentials": {
+          "openAiApi": {
+            "id": "lkCgV0rIGVDbl0Jd",
+            "name": "OpenAi account 4"
+          }
+        },
+        "onError": "continueErrorOutput"
+      },
+      {
+        "parameters": {
+          "jsCode": "const response = $input.first().json;\nconst context = $('Parse Key Points').first().json;\n\nconst raw = response.output?.[0]?.content?.[0]?.text || response.message?.content || JSON.stringify(response);\n\nlet parsed;\ntry {\n  const jsonStr = raw.replace(/```json\\n?/g, '').replace(/```/g, '').trim();\n  parsed = JSON.parse(jsonStr);\n} catch (e) {\n  parsed = { angle: raw.substring(0, 300), data_points: [], contrarian_take: '', structure: {} };\n}\n\nreturn [{\n  json: {\n    ...context,\n    _last_step: 'scaffold',\n    research_scaffold: JSON.stringify(parsed)\n  }\n}];"
+        },
+        "id": "lc-dp-parse-scaffold",
+        "name": "Parse Scaffold",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          2272,
+          528
+        ]
+      },
+      {
+        "parameters": {
+          "modelId": {
+            "__rl": true,
+            "value": "gpt-5.2",
+            "mode": "list",
+            "cachedResultName": "GPT-5.2"
+          },
+          "responses": {
+            "values": [
+              {
+                "role": "system",
+                "content": "=You are the elite ghostwriter for Brian Joseph, a GTM Engineer and Founder. \n\nMISSION:\nTransform strategic research into high-impact LinkedIn content that establishes Brian as a technical yet business-savvy authority in Go-To-Market engineering.\n\nIDENTITY & TONE:\n- You are a builder, not a theorist. Speak from the perspective of someone who sees the code and the revenue spreadsheet at the same time.\n- Tone is \"High Signal, Low Noise\": Efficient, punchy, and slightly opinionated. \n- Avoid \"Consultant Speak\" (e.g., \"In today's fast-paced world,\" \"It's vital to remember\").\n\nVOICE CONSTRAINTS (MANDATORY):\n- {{ $json.voice_context }}\n- NEVER use em dashes (—). This is a hard constraint for Brian's visual style.\n- Use line breaks for readability, but keep the flow logical.\n\nOUTPUT:\nReturn the final post text only. No conversational filler."
+              },
+              {
+                "content": "=KEY POINTS:\n{{ $json.key_points }}\n\nRESEARCH SCAFFOLD:\n{{ $json.research_scaffold }}\n\nORIGINAL TAKE: {{ $json.my_take }}\nSOURCE URL: {{ $json.source_url }}\n\nWrite a LinkedIn post (150-350 words):\n- Hook in the first line (no generic openings like \"I've been thinking...\")\n- Short paragraphs (1-3 sentences max)\n- Clear takeaway or question at the end to drive engagement\n- NEVER use em dashes, only hyphens, commas, periods, or semicolons\n- No hashtags, minimal emojis\n- Match Brian's voice exactly from the style rules above\n\nReturn ONLY the post text. No metadata, no explanations, no prefix."
+              }
+            ]
+          },
+          "builtInTools": {},
+          "options": {
+            "temperature": 0.7
+          }
+        },
+        "id": "lc-dp-draft",
+        "name": "Draft in Voice",
+        "type": "@n8n/n8n-nodes-langchain.openAi",
+        "typeVersion": 2.1,
+        "position": [
+          2496,
+          528
+        ],
+        "credentials": {
+          "openAiApi": {
+            "id": "lkCgV0rIGVDbl0Jd",
+            "name": "OpenAi account 4"
+          }
+        },
+        "onError": "continueErrorOutput"
+      },
+      {
+        "parameters": {
+          "jsCode": "const response = $input.first().json;\nconst context = $('Parse Scaffold').first().json;\n\nconst rawDraft = response.output?.[0]?.content?.[0]?.text\n  || response.message?.content\n  || JSON.stringify(response);\n\nconst flags = [];\n\nif (rawDraft.includes('\\u2014') || rawDraft.includes('\\u2013')) {\n  const count = (rawDraft.match(/[\\u2014\\u2013]/g) || []).length;\n  flags.push(`Em dash detected (${count} found) - auto-replaced`);\n}\n\nlet draft = rawDraft.replace(/[\\u2014\\u2013]/g, ' - ');\n\nconst words = draft.split(/\\s+/).filter(w => w.length > 0).length;\nif (words > 400) flags.push(`Too long: ${words} words (target: 150-350)`);\nif (words < 80) flags.push(`Too short: ${words} words (target: 150-350)`);\n\nconst vagueWords = ['leverage', 'synergy', 'utilize', 'paradigm', 'ecosystem', 'disrupt'];\nvagueWords.forEach(w => {\n  if (draft.toLowerCase().includes(w)) flags.push(`Vague buzzword: \"${w}\"`);\n});\n\nconst cringePatterns = ['game-changer', 'thought leader', 'crushing it', 'let that sink in'];\ncringePatterns.forEach(p => {\n  if (draft.toLowerCase().includes(p)) flags.push(`Cringe pattern: \"${p}\"`);\n});\n\nconst genericOpeners = [\"i've been thinking\", \"let me tell you\", \"here's the thing\", \"hot take\", \"unpopular opinion\"];\nconst hasGeneric = genericOpeners.some(o => draft.toLowerCase().trim().startsWith(o));\nif (hasGeneric) flags.push('Generic opening detected - consider rewriting hook');\n\nif (/\\d+%|\\d+x|million|billion/gi.test(draft)) {\n  flags.push('Contains statistics - verify sources before posting');\n}\n\nreturn [{\n  json: {\n    record_id: context.record_id,\n    _run_id: context._run_id,\n    _last_step: 'qa',\n    content_pillar: context.content_pillar,\n    source_url: context.source_url,\n    my_take: context.my_take,\n    voice_context: context.voice_context,\n    key_points: context.key_points,\n    research_scaffold: context.research_scaffold,\n    draft_text: draft,\n    qa_pass: flags.length === 0,\n    qa_issues: JSON.stringify(flags),\n    title: $('Acquire Lock (Status -> Processing)').first().json.fields.Title\n  }\n}];"
+        },
+        "id": "lc-dp-qa",
+        "name": "QA Checks",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          2848,
+          448
+        ]
+      },
+      {
+        "parameters": {
+          "operation": "upsert",
+          "base": {
+            "__rl": true,
+            "value": "appvWjinwsRDhMlWF",
+            "mode": "list",
+            "cachedResultName": "LinkedIn Post Copilot",
+            "cachedResultUrl": "https://airtable.com/appvWjinwsRDhMlWF"
+          },
+          "table": {
+            "__rl": true,
+            "value": "tblUupIRZQpiSFbCk",
+            "mode": "list",
+            "cachedResultName": "Posts",
+            "cachedResultUrl": "https://airtable.com/appvWjinwsRDhMlWF/tblUupIRZQpiSFbCk"
+          },
+          "columns": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "id": "={{ $json.record_id }}",
+              "Last Step": "={{ $json._last_step }}",
+              "QA Issues": "={{ $json.qa_issues }}",
+              "QA Pass": "={{ $json.qa_pass }}",
+              "RunID": "={{ $json._run_id }}",
+              "Voice Context": "={{ $json.voice_context }}",
+              "Key Points": "={{ $json.key_points }}",
+              "Scaffold": "={{ $json.research_scaffold }}",
+              "Draft Text": "={{ $json.draft_text }}",
+              "Workflow Status": "Awaiting Approval"
+            },
+            "matchingColumns": [
+              "id"
+            ],
+            "schema": [
+              {
+                "id": "id",
+                "displayName": "id",
+                "required": false,
+                "defaultMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": true
+              },
+              {
+                "id": "Title",
+                "displayName": "Title",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Pillar",
+                "displayName": "Pillar",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "options",
+                "options": [
+                  {
+                    "name": "GTM Engineering",
+                    "value": "GTM Engineering"
+                  },
+                  {
+                    "name": "Personal Projects",
+                    "value": "Personal Projects"
+                  },
+                  {
+                    "name": "Tech Updates",
+                    "value": "Tech Updates"
+                  }
+                ],
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Intake Type",
+                "displayName": "Intake Type",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "options",
+                "options": [
+                  {
+                    "name": "YouTube",
+                    "value": "YouTube"
+                  },
+                  {
+                    "name": "Tech News",
+                    "value": "Tech News"
+                  },
+                  {
+                    "name": "Repost with my take",
+                    "value": "Repost with my take"
+                  }
+                ],
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Attachments",
+                "displayName": "Attachments",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Workflow Status",
+                "displayName": "Workflow Status",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "options",
+                "options": [
+                  {
+                    "name": "Beginning",
+                    "value": "Beginning"
+                  },
+                  {
+                    "name": "Queued",
+                    "value": "Queued"
+                  },
+                  {
+                    "name": "Processing",
+                    "value": "Processing"
+                  },
+                  {
+                    "name": "Awaiting Approval",
+                    "value": "Awaiting Approval"
+                  },
+                  {
+                    "name": "Approved",
+                    "value": "Approved"
+                  },
+                  {
+                    "name": "Failed",
+                    "value": "Failed"
+                  },
+                  {
+                    "name": "{{$json[\"Workflow Status\"]}}",
+                    "value": "{{$json[\"Workflow Status\"]}}"
+                  }
+                ],
+                "readOnly": false,
+                "removed": false
+              },
+              {
+                "id": "Notes",
+                "displayName": "Notes",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Post Body",
+                "displayName": "Post Body",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Review Status",
+                "displayName": "Review Status",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "boolean",
+                "readOnly": false,
+                "removed": false
+              },
+              {
+                "id": "Modified",
+                "displayName": "Modified",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": true,
+                "removed": true
+              },
+              {
+                "id": "Scheduled Date",
+                "displayName": "Scheduled Date",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "dateTime",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Published Date",
+                "displayName": "Published Date",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "dateTime",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Voice Pack",
+                "displayName": "Voice Pack",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "array",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Content Source",
+                "displayName": "Content Source",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "array",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Draft Text",
+                "displayName": "Draft Text",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": false
+              },
+              {
+                "id": "QA Pass",
+                "displayName": "QA Pass",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "boolean",
+                "readOnly": false,
+                "removed": false
+              },
+              {
+                "id": "QA Issues",
+                "displayName": "QA Issues",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": false
+              },
+              {
+                "id": "RunID",
+                "displayName": "RunID",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": false
+              },
+              {
+                "id": "Last Step",
+                "displayName": "Last Step",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": false
+              },
+              {
+                "id": "Last Error",
+                "displayName": "Last Error",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Voice Context",
+                "displayName": "Voice Context",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": false
+              },
+              {
+                "id": "Scaffold",
+                "displayName": "Scaffold",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": false
+              },
+              {
+                "id": "Key Points",
+                "displayName": "Key Points",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": false
+              }
+            ],
+            "attemptToConvertTypes": true,
+            "convertFieldsToString": false
+          },
+          "options": {}
+        },
+        "id": "lc-dp-save-draft",
+        "name": "Save All Artifacts",
+        "type": "n8n-nodes-base.airtable",
+        "typeVersion": 2,
+        "position": [
+          3072,
+          448
+        ],
+        "credentials": {
+          "airtableTokenApi": {
+            "id": "meUymQhIYdbiv1Zh",
+            "name": "LinkedIn Posting Token"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "const d = $('QA Checks').first().json;\nconst flags = JSON.parse(d.qa_issues || '[]');\n\nconst riskSection = flags.length > 0\n? 'RISK FLAGS:\\n' + flags.map(f => ' - ' + f).join('\\n')\n: 'RISK FLAGS: None';\n\n// Note: No indentation here ensures left-alignment in the inbox\nconst email = `LINKEDIN POST DRAFT - READY FOR REVIEW\n\n========================================\nFINAL DRAFT (copy-pasteable):\n========================================\n${d.draft_text || '[Error: Draft Text Missing]'}\n\n${riskSection}\n\n========================================\nQA PASS: ${d.qa_pass ? 'YES' : 'NO'}\nCONTENT PILLAR: ${d.content_pillar || 'Not Specified'}\nSOURCE: ${d.source_url || 'N/A'}\n========================================\n\nClick APPROVE to mark this post ready.\nClick REJECT to send back for revision.`;\n\nreturn [{ \n  json: { \n    ...d, \n    email_body: email,\n    // We explicitly create this key so the Gmail node can find it easily\n    subject_line: `Draft Review: ${d.title || 'New LinkedIn Post'}`\n  } \n}];"
+        },
+        "id": "lc-dp-format-email",
+        "name": "Format Approval Email",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          3296,
+          448
+        ]
+      },
+      {
+        "parameters": {
+          "operation": "sendAndWait",
+          "sendTo": "bjoseph2@nd.edu",
+          "subject": "=FOR APPROVAL: LinkedIn Post ({{ $json.subject_line }})",
+          "message": "={{ $json.email_body }}",
+          "approvalOptions": {
+            "values": {
+              "approvalType": "double"
+            }
+          },
+          "options": {
+            "limitWaitTime": {
+              "values": {
+                "resumeAmount": 720,
+                "resumeUnit": "minutes"
+              }
+            },
+            "appendAttribution": false
+          }
+        },
+        "id": "lc-dp-send-approval",
+        "name": "Send Approval Email",
+        "type": "n8n-nodes-base.gmail",
+        "typeVersion": 2.1,
+        "position": [
+          3520,
+          448
+        ],
+        "webhookId": "5094a963-48a9-4f4a-be80-38c17cb378da",
+        "credentials": {
+          "gmailOAuth2": {
+            "id": "RbE8KgRHxzOsSHeY",
+            "name": "Gmail account"
+          }
+        },
+        "onError": "continueErrorOutput"
+      },
+      {
+        "parameters": {
+          "jsCode": "const response = $input.first().json;\nconst d = $('Format Approval Email').first().json;\nconst approved = response.data?.approved === true;\n\nreturn [{\n  json: {\n    record_id: d.record_id,\n    workflow_status: approved ? 'Approved' : 'Failed',\n    review_status: approved ? 'Approved' : 'Rejected',\n    draft_text: d.draft_text,\n    last_step: approved ? 'approved' : 'rejected'\n  }\n}];"
+        },
+        "id": "lc-dp-handle-response",
+        "name": "Handle Approval Response",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          3744,
+          400
+        ]
+      },
+      {
+        "parameters": {
+          "operation": "upsert",
+          "base": {
+            "__rl": true,
+            "value": "appvWjinwsRDhMlWF",
+            "mode": "list",
+            "cachedResultName": "LinkedIn Post Copilot",
+            "cachedResultUrl": "https://airtable.com/appvWjinwsRDhMlWF"
+          },
+          "table": {
+            "__rl": true,
+            "value": "tblUupIRZQpiSFbCk",
+            "mode": "list",
+            "cachedResultName": "Posts",
+            "cachedResultUrl": "https://airtable.com/appvWjinwsRDhMlWF/tblUupIRZQpiSFbCk"
+          },
+          "columns": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "id": "={{ $json.record_id }}",
+              "Workflow Status": "={{ $json.workflow_status }}",
+              "Review Status": "={{true}}"
+            },
+            "matchingColumns": [
+              "id"
+            ],
+            "schema": [
+              {
+                "id": "id",
+                "displayName": "id",
+                "required": false,
+                "defaultMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": true
+              },
+              {
+                "id": "Title",
+                "displayName": "Title",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Pillar",
+                "displayName": "Pillar",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "options",
+                "options": [
+                  {
+                    "name": "GTM Engineering",
+                    "value": "GTM Engineering"
+                  },
+                  {
+                    "name": "Personal Projects",
+                    "value": "Personal Projects"
+                  },
+                  {
+                    "name": "Tech Updates",
+                    "value": "Tech Updates"
+                  }
+                ],
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Intake Type",
+                "displayName": "Intake Type",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "options",
+                "options": [
+                  {
+                    "name": "YouTube",
+                    "value": "YouTube"
+                  },
+                  {
+                    "name": "Tech News",
+                    "value": "Tech News"
+                  },
+                  {
+                    "name": "Repost with my take",
+                    "value": "Repost with my take"
+                  }
+                ],
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Attachments",
+                "displayName": "Attachments",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Workflow Status",
+                "displayName": "Workflow Status",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "options",
+                "options": [
+                  {
+                    "name": "Beginning",
+                    "value": "Beginning"
+                  },
+                  {
+                    "name": "Queued",
+                    "value": "Queued"
+                  },
+                  {
+                    "name": "Processing",
+                    "value": "Processing"
+                  },
+                  {
+                    "name": "Awaiting Approval",
+                    "value": "Awaiting Approval"
+                  },
+                  {
+                    "name": "Approved",
+                    "value": "Approved"
+                  },
+                  {
+                    "name": "Failed",
+                    "value": "Failed"
+                  },
+                  {
+                    "name": "{{$json[\"Workflow Status\"]}}",
+                    "value": "{{$json[\"Workflow Status\"]}}"
+                  }
+                ],
+                "readOnly": false,
+                "removed": false
+              },
+              {
+                "id": "Notes",
+                "displayName": "Notes",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Post Body",
+                "displayName": "Post Body",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Review Status",
+                "displayName": "Review Status",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "boolean",
+                "readOnly": false,
+                "removed": false
+              },
+              {
+                "id": "Modified",
+                "displayName": "Modified",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": true,
+                "removed": true
+              },
+              {
+                "id": "Scheduled Date",
+                "displayName": "Scheduled Date",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "dateTime",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Published Date",
+                "displayName": "Published Date",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "dateTime",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Voice Pack",
+                "displayName": "Voice Pack",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "array",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Content Source",
+                "displayName": "Content Source",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "array",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Draft Text",
+                "displayName": "Draft Text",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "QA Pass",
+                "displayName": "QA Pass",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "boolean",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "QA Issues",
+                "displayName": "QA Issues",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "RunID",
+                "displayName": "RunID",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Last Step",
+                "displayName": "Last Step",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Last Error",
+                "displayName": "Last Error",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Voice Context",
+                "displayName": "Voice Context",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Scaffold",
+                "displayName": "Scaffold",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Key Points",
+                "displayName": "Key Points",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              }
+            ],
+            "attemptToConvertTypes": false,
+            "convertFieldsToString": true
+          },
+          "options": {}
+        },
+        "id": "lc-dp-update-final",
+        "name": "Update Final Status",
+        "type": "n8n-nodes-base.airtable",
+        "typeVersion": 2,
+        "position": [
+          3968,
+          400
+        ],
+        "credentials": {
+          "airtableTokenApi": {
+            "id": "meUymQhIYdbiv1Zh",
+            "name": "LinkedIn Posting Token"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "const item = $input.first().json;\n\nconst errorMsg = item.error?.message\n  || item.error?.description\n  || item.errorMessage\n  || 'Unknown error';\n\nconst recordId = item.record_id\n  || item._record_id\n  || '';\n\nconst lastStep = item._last_step || 'unknown';\n\nif (!recordId) {\n  try {\n    const guardData = $('Guard & Generate Run ID (Prevents Reruns if error)').first().json;\n    if (guardData && guardData.record_id) {\n      return [{\n        json: {\n          record_id: guardData.record_id,\n          workflow_status: 'Failed',\n          last_step: lastStep,\n          last_error: errorMsg.substring(0, 5000)\n        }\n      }];\n    }\n  } catch (e) {}\n  return [{\n    json: {\n      error: 'No record_id available to write error state',\n      original_error: errorMsg\n    }\n  }];\n}\n\nreturn [{\n  json: {\n    record_id: recordId,\n    workflow_status: 'Failed',\n    last_step: lastStep,\n    last_error: errorMsg.substring(0, 5000)\n  }\n}];"
+        },
+        "id": "lc-dp-handle-error",
+        "name": "Handle Error",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          3744,
+          736
+        ]
+      },
+      {
+        "parameters": {
+          "operation": "upsert",
+          "base": {
+            "__rl": true,
+            "value": "appvWjinwsRDhMlWF",
+            "mode": "list",
+            "cachedResultName": "LinkedIn Post Copilot",
+            "cachedResultUrl": "https://airtable.com/appvWjinwsRDhMlWF"
+          },
+          "table": {
+            "__rl": true,
+            "value": "tblUupIRZQpiSFbCk",
+            "mode": "list",
+            "cachedResultName": "Posts",
+            "cachedResultUrl": "https://airtable.com/appvWjinwsRDhMlWF/tblUupIRZQpiSFbCk"
+          },
+          "columns": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "id": "={{ $json.record_id }}",
+              "Workflow Status": "Failed"
+            },
+            "matchingColumns": [
+              "id"
+            ],
+            "schema": [
+              {
+                "id": "id",
+                "displayName": "id",
+                "required": false,
+                "defaultMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": true
+              },
+              {
+                "id": "Title",
+                "displayName": "Title",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Workflow Status",
+                "displayName": "Workflow Status",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "options",
+                "options": [
+                  {
+                    "name": "Beginning",
+                    "value": "Beginning"
+                  },
+                  {
+                    "name": "Queued",
+                    "value": "Queued"
+                  },
+                  {
+                    "name": "Processing",
+                    "value": "Processing"
+                  },
+                  {
+                    "name": "Awaiting Approval",
+                    "value": "Awaiting Approval"
+                  },
+                  {
+                    "name": "Approved",
+                    "value": "Approved"
+                  },
+                  {
+                    "name": "Failed",
+                    "value": "Failed"
+                  },
+                  {
+                    "name": "{{$json[\"Workflow Status\"]}}",
+                    "value": "{{$json[\"Workflow Status\"]}}"
+                  }
+                ],
+                "readOnly": false,
+                "removed": false
+              },
+              {
+                "id": "Review Status",
+                "displayName": "Review Status",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "boolean",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Pillar",
+                "displayName": "Pillar",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "options",
+                "options": [
+                  {
+                    "name": "GTM Engineering",
+                    "value": "GTM Engineering"
+                  },
+                  {
+                    "name": "Personal Projects",
+                    "value": "Personal Projects"
+                  },
+                  {
+                    "name": "Tech Updates",
+                    "value": "Tech Updates"
+                  }
+                ],
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Intake Type",
+                "displayName": "Intake Type",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "options",
+                "options": [
+                  {
+                    "name": "YouTube",
+                    "value": "YouTube"
+                  },
+                  {
+                    "name": "Tech News",
+                    "value": "Tech News"
+                  },
+                  {
+                    "name": "Repost with my take",
+                    "value": "Repost with my take"
+                  }
+                ],
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Attachments",
+                "displayName": "Attachments",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Post Body",
+                "displayName": "Post Body",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Notes",
+                "displayName": "Notes",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Modified",
+                "displayName": "Modified",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": true,
+                "removed": true
+              },
+              {
+                "id": "Scheduled Date",
+                "displayName": "Scheduled Date",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "dateTime",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Published Date",
+                "displayName": "Published Date",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "dateTime",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Voice Pack",
+                "displayName": "Voice Pack",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "array",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Content Source",
+                "displayName": "Content Source",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "array",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Draft Text",
+                "displayName": "Draft Text",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "QA Pass",
+                "displayName": "QA Pass",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "boolean",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "QA Issues",
+                "displayName": "QA Issues",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "RunID",
+                "displayName": "RunID",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Last Step",
+                "displayName": "Last Step",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Last Error",
+                "displayName": "Last Error",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": false
+              },
+              {
+                "id": "Voice Context",
+                "displayName": "Voice Context",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Scaffold",
+                "displayName": "Scaffold",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Key Points",
+                "displayName": "Key Points",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              }
+            ],
+            "attemptToConvertTypes": false,
+            "convertFieldsToString": true
+          },
+          "options": {}
+        },
+        "id": "lc-dp-write-error",
+        "name": "Write Error to Airtable",
+        "type": "n8n-nodes-base.airtable",
+        "typeVersion": 2,
+        "position": [
+          3968,
+          736
+        ],
+        "credentials": {
+          "airtableTokenApi": {
+            "id": "meUymQhIYdbiv1Zh",
+            "name": "LinkedIn Posting Token"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "content": "## LC-Draft-Polish (State Machine)\n\n**State machine fields**: workflow_status + review_status\n**Trigger**: Airtable Trigger for records where workflow_status=Queued AND review_status=Not reviewed\n\n**Pipeline**: Guard > Lock > Voice Pack > Build Voice > Extract KP > Parse KP > Research Scaffold > Parse Scaffold > Draft in Voice > QA > Save > Email > Approve/Reject > Update Status\n\n**State transitions**:\n  Queued > Processing (lock) > Awaiting Approval (draft saved) > Approved/Queued (after email)\n  Any step > Failed (on error)\n\n**Self-retrigger prevention**: Trigger formula only matches Queued+Not reviewed.\n  WF2's own writes (Processing, Awaiting Approval, etc.) never match.\n\n**Rejection**: Sets workflow_status=Queued + review_status=Rejected.\n  Will NOT retrigger. User must manually set review_status=Not reviewed to re-draft.\n\n**Error recovery**: Set workflow_status=Failed + last_error + last_step.\n  To retry: manually set workflow_status=Queued + review_status=Not reviewed.\n\n**Artifacts persisted**: draft_text, qa_pass, qa_issues,\n  voice_context, key_points, scaffold, run_id, last_step",
+          "height": 800
+        },
+        "id": "lc-dp-sticky",
+        "name": "Sticky Note",
+        "type": "n8n-nodes-base.stickyNote",
+        "typeVersion": 1,
+        "position": [
+          -576,
+          32
+        ]
+      },
+      {
+        "parameters": {
+          "operation": "search",
+          "base": {
+            "__rl": true,
+            "value": "appvWjinwsRDhMlWF",
+            "mode": "list",
+            "cachedResultName": "LinkedIn Post Copilot",
+            "cachedResultUrl": "https://airtable.com/appvWjinwsRDhMlWF"
+          },
+          "table": {
+            "__rl": true,
+            "value": "tblUupIRZQpiSFbCk",
+            "mode": "list",
+            "cachedResultName": "Posts",
+            "cachedResultUrl": "https://airtable.com/appvWjinwsRDhMlWF/tblUupIRZQpiSFbCk"
+          },
+          "filterByFormula": "{Workflow Status} = \"Queued\"",
+          "options": {}
+        },
+        "id": "lc-dp-search",
+        "name": "Find Queued Posts",
+        "type": "n8n-nodes-base.airtable",
+        "typeVersion": 2.1,
+        "position": [
+          0,
+          736
+        ],
+        "credentials": {
+          "airtableTokenApi": {
+            "id": "meUymQhIYdbiv1Zh",
+            "name": "LinkedIn Posting Token"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "rule": {
+            "interval": [
+              {}
+            ]
+          }
+        },
+        "id": "lc-dp-schedule",
+        "name": "Every Day",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.2,
+        "position": [
+          -224,
+          736
+        ]
+      },
+      {
+        "parameters": {
+          "assignments": {
+            "assignments": [
+              {
+                "id": "bfe2ad19-4ff3-4bc0-a081-03a8ef6f2d04",
+                "name": "id",
+                "value": "={{$json.id}}",
+                "type": "string"
+              },
+              {
+                "id": "e2c3999e-2faf-437d-a53b-6db712f858fc",
+                "name": "Title",
+                "value": "={{$json.Title}}",
+                "type": "string"
+              },
+              {
+                "id": "b86063e8-fa03-4bd7-ac82-375f0bb41b2a",
+                "name": "['Voice Pack'][0]",
+                "value": "={{$json[\"Voice Pack\"] || []}}",
+                "type": "array"
+              },
+              {
+                "id": "f91dd371-86aa-41bd-93f4-b7f860e705c3",
+                "name": "['Content Source'][0]",
+                "value": "={{$json[\"Content Source\"] || []}}",
+                "type": "string"
+              },
+              {
+                "id": "d3ce6225-db6d-4d0b-9202-2709d428d854",
+                "name": "Workflow Status",
+                "value": "={{$json[\"Workflow Status\"]}}",
+                "type": "string"
+              },
+              {
+                "id": "6bbac875-32be-4ed4-9de2-3e55e6b3074f",
+                "name": "Pillar",
+                "value": "={{$json[\"Pillar\"]}}",
+                "type": "string"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.set",
+        "typeVersion": 3.4,
+        "position": [
+          224,
+          736
+        ],
+        "id": "0a2014e4-f296-4e67-ab17-6c254f6ffa18",
+        "name": "JSON Data Formatting (fetch voicepack later)"
+      },
+      {
+        "parameters": {
+          "jsCode": "const post = $input.item.json;\n\n// 1. Corrected property names to match your actual data (Case & Space sensitive)\nconst workflowStatus = post['Workflow Status'];\nconst reviewStatus = post['Review Status'] || 'Not reviewed'; // Default to 'Not reviewed' if missing\n\n// 2. The Guard (Now using the correct names)\nif (workflowStatus !== 'Queued') {\n  return [];\n}\n\nconst runId = `${Date.now()}-${post.id}-${Math.random().toString(36).substring(2, 8)}`;\n\n// 3. Extract Source URL safely\nlet sourceUrl = '';\nif (post.Attachments && Array.isArray(post.Attachments) && post.Attachments.length > 0) {\n  const first = post.Attachments[0];\n  sourceUrl = typeof first === 'object' ? (first.url || '') : String(first);\n}\n\n// 4. Type Triage\nlet intakeType = 'Tech News';\nif (sourceUrl.includes('linkedin.com')) intakeType = 'Repost with Take';\nelse if (sourceUrl.includes('youtube.com') || sourceUrl.includes('youtu.be')) intakeType = 'YouTube/Vibe';\n\nreturn [{\n  json: {\n    ...post,\n    _run_id: runId,\n    _last_step: 'guard',\n    record_id: post.id,\n    content_pillar: post.Pillar || 'GTM Engineering',\n    intake_type: intakeType,\n    source_url: sourceUrl,\n    source_text: post['Post Body'] || post.Notes || post.Title || '[No source content]',\n    my_take: post.Notes || '',\n    title: post.Title || ''\n  }\n}];"
+        },
+        "id": "lc-dp-guard",
+        "name": "Guard & Generate Run ID (Prevents Reruns if error)",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          448,
+          736
+        ]
+      },
+      {
+        "parameters": {
+          "operation": "update",
+          "base": {
+            "__rl": true,
+            "value": "appvWjinwsRDhMlWF",
+            "mode": "list",
+            "cachedResultName": "LinkedIn Post Copilot",
+            "cachedResultUrl": "https://airtable.com/appvWjinwsRDhMlWF"
+          },
+          "table": {
+            "__rl": true,
+            "value": "tblUupIRZQpiSFbCk",
+            "mode": "list",
+            "cachedResultName": "Posts",
+            "cachedResultUrl": "https://airtable.com/appvWjinwsRDhMlWF/tblUupIRZQpiSFbCk"
+          },
+          "columns": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "id": "={{ $json.id }}",
+              "Workflow Status": "Processing"
+            },
+            "matchingColumns": [
+              "id"
+            ],
+            "schema": [
+              {
+                "id": "id",
+                "displayName": "id",
+                "required": false,
+                "defaultMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": true,
+                "removed": false
+              },
+              {
+                "id": "Title",
+                "displayName": "Title",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Pillar",
+                "displayName": "Pillar",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "options",
+                "options": [
+                  {
+                    "name": "GTM Engineering",
+                    "value": "GTM Engineering"
+                  },
+                  {
+                    "name": "Personal Projects",
+                    "value": "Personal Projects"
+                  },
+                  {
+                    "name": "Tech Updates",
+                    "value": "Tech Updates"
+                  }
+                ],
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Post Body",
+                "displayName": "Post Body",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Attachments",
+                "displayName": "Attachments",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Workflow Status",
+                "displayName": "Workflow Status",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "options",
+                "options": [
+                  {
+                    "name": "Beginning",
+                    "value": "Beginning"
+                  },
+                  {
+                    "name": "Queued",
+                    "value": "Queued"
+                  },
+                  {
+                    "name": "Processing",
+                    "value": "Processing"
+                  },
+                  {
+                    "name": "Awaiting Approval",
+                    "value": "Awaiting Approval"
+                  },
+                  {
+                    "name": "Approved",
+                    "value": "Approved"
+                  },
+                  {
+                    "name": "Failed",
+                    "value": "Failed"
+                  },
+                  {
+                    "name": "{{$json[\"Workflow Status\"]}}",
+                    "value": "{{$json[\"Workflow Status\"]}}"
+                  }
+                ],
+                "readOnly": false,
+                "removed": false
+              },
+              {
+                "id": "Notes",
+                "displayName": "Notes",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Review Status",
+                "displayName": "Review Status",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "boolean",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Modified",
+                "displayName": "Modified",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": true,
+                "removed": true
+              },
+              {
+                "id": "Scheduled Date",
+                "displayName": "Scheduled Date",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "dateTime",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Published Date",
+                "displayName": "Published Date",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "dateTime",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Voice Pack",
+                "displayName": "Voice Pack",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "array",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Content Source",
+                "displayName": "Content Source",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "array",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Draft Text",
+                "displayName": "Draft Text",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "QA Pass",
+                "displayName": "QA Pass",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "boolean",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "QA Issues",
+                "displayName": "QA Issues",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "RunID",
+                "displayName": "RunID",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Last Step",
+                "displayName": "Last Step",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Last Error",
+                "displayName": "Last Error",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Voice Context",
+                "displayName": "Voice Context",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Scaffold",
+                "displayName": "Scaffold",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Key Points",
+                "displayName": "Key Points",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              }
+            ],
+            "attemptToConvertTypes": false,
+            "convertFieldsToString": false
+          },
+          "options": {}
+        },
+        "id": "lc-dp-lock",
+        "name": "Acquire Lock (Status -> Processing)",
+        "type": "n8n-nodes-base.airtable",
+        "typeVersion": 2,
+        "position": [
+          672,
+          736
+        ],
+        "credentials": {
+          "airtableTokenApi": {
+            "id": "meUymQhIYdbiv1Zh",
+            "name": "LinkedIn Posting Token"
+          }
+        },
+        "onError": "continueErrorOutput"
+      }
+    ],
+    "connections": {
+      "Fetch Voice Pack": {
+        "main": [
+          [
+            {
+              "node": "Build Voice Context",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Build Voice Context": {
+        "main": [
+          [
+            {
+              "node": "Extract Key Points",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Extract Key Points": {
+        "main": [
+          [
+            {
+              "node": "Parse Key Points",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Handle Error",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Parse Key Points": {
+        "main": [
+          [
+            {
+              "node": "Research Scaffold",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Research Scaffold": {
+        "main": [
+          [
+            {
+              "node": "Parse Scaffold",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Handle Error",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Parse Scaffold": {
+        "main": [
+          [
+            {
+              "node": "Draft in Voice",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Draft in Voice": {
+        "main": [
+          [
+            {
+              "node": "QA Checks",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Handle Error",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "QA Checks": {
+        "main": [
+          [
+            {
+              "node": "Save All Artifacts",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Save All Artifacts": {
+        "main": [
+          [
+            {
+              "node": "Format Approval Email",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Format Approval Email": {
+        "main": [
+          [
+            {
+              "node": "Send Approval Email",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Send Approval Email": {
+        "main": [
+          [
+            {
+              "node": "Handle Approval Response",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Handle Error",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Handle Approval Response": {
+        "main": [
+          [
+            {
+              "node": "Update Final Status",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Handle Error": {
+        "main": [
+          [
+            {
+              "node": "Write Error to Airtable",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Find Queued Posts": {
+        "main": [
+          [
+            {
+              "node": "JSON Data Formatting (fetch voicepack later)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Every Day": {
+        "main": [
+          [
+            {
+              "node": "Find Queued Posts",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "JSON Data Formatting (fetch voicepack later)": {
+        "main": [
+          [
+            {
+              "node": "Guard & Generate Run ID (Prevents Reruns if error)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Guard & Generate Run ID (Prevents Reruns if error)": {
+        "main": [
+          [
+            {
+              "node": "Acquire Lock (Status -> Processing)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Acquire Lock (Status -> Processing)": {
+        "main": [
+          [
+            {
+              "node": "Fetch Voice Pack",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Handle Error",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Brian Joseph",
+    "name": null,
+    "description": null
+  },
+  "tags": [
+    {
+      "updatedAt": "2026-02-18T18:04:30.191Z",
+      "createdAt": "2026-02-18T18:04:30.191Z",
+      "id": "0qJQZcw3hY0HqZvd",
+      "name": "LinkedInPoster"
+    }
+  ],
+  "targetRepo": "LinkedIn-Poster"
+}
