@@ -170,4 +170,4 @@ Active and running. Currently testing different content formats and engagement s
 
 ---
 
-**Questions?** Reach out on [LinkedIn](https://www.linkedin.com/in/brianmathewjoseph/) or email me at brian@josephbrian671.com
+**Questions?** Reach out on [LinkedIn](https://www.linkedin.com/in/brianmathewjoseph/) or email me at josephbrian671@gmail.com
