@@ -1,0 +1,959 @@
+{
+  "updatedAt": "2026-02-18T18:04:55.615Z",
+  "createdAt": "2026-02-02T03:19:54.204Z",
+  "id": "Z8IpUKOcqPkg04rt",
+  "name": "WF0: Intake",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## LC-Intake\n\n**Purpose**: When you create a new row in the Posts table, this workflow automatically:\n1. Fetches content from the source URL (if provided)\n2. Extracts readable text from the page\n3. Sets status to \"Captured\" (which triggers LC-Draft-Polish)\n\n**Your workflow**:\n1. Go to Airtable Posts table\n2. Create new row: paste source_url, type my_take, select intake_type + content_pillar\n3. This workflow fires automatically and enriches the record\n4. LC-Draft-Polish then picks it up and generates a draft\n\n**Setup**:\n1. Replace PLACEHOLDER_BASE_ID with your Airtable base ID\n2. Replace PLACEHOLDER_POSTS_TABLE_ID with your Posts table ID\n3. Make sure Posts table has a 'created_at' field (type: Created Time)",
+        "height": 752
+      },
+      "id": "c56c4c9c-198e-4202-8085-2693feb3e737",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -352,
+        64
+      ]
+    },
+    {
+      "parameters": {
+        "formTitle": "LinkedIn Post",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Title"
+            },
+            {
+              "fieldLabel": "Pillar",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "GTM Engineering"
+                  },
+                  {
+                    "option": "Personal Projects"
+                  },
+                  {
+                    "option": "Tech Updates"
+                  }
+                ]
+              },
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Attachments"
+            },
+            {
+              "fieldLabel": "Post Body",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Intake Type",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "Repost with my Take"
+                  },
+                  {
+                    "option": "Tech News"
+                  },
+                  {
+                    "option": "YouTube"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.3,
+      "position": [
+        64,
+        416
+      ],
+      "id": "d297d5be-da5f-430a-8493-bb9715b7f8a7",
+      "name": "On form submission",
+      "webhookId": "6d424daa-5b40-4ced-885d-56fe76bb25a9"
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "base": {
+          "__rl": true,
+          "value": "appvWjinwsRDhMlWF",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Post Copilot",
+          "cachedResultUrl": "https://airtable.com/appvWjinwsRDhMlWF"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblUupIRZQpiSFbCk",
+          "mode": "list",
+          "cachedResultName": "Posts",
+          "cachedResultUrl": "https://airtable.com/appvWjinwsRDhMlWF/tblUupIRZQpiSFbCk"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Title": "={{ $json.Title }}",
+            "Pillar": "={{ $json.Pillar }}",
+            "Post Body": "={{ $json['Post Body'] }}",
+            "Attachments": "={{ $json.Attachments }}",
+            "Workflow Status": "Beginning"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Title",
+              "displayName": "Title",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Pillar",
+              "displayName": "Pillar",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "GTM Engineering",
+                  "value": "GTM Engineering"
+                },
+                {
+                  "name": "Personal Projects",
+                  "value": "Personal Projects"
+                },
+                {
+                  "name": "Tech Updates",
+                  "value": "Tech Updates"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Post Body",
+              "displayName": "Post Body",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Attachments",
+              "displayName": "Attachments",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Workflow Status",
+              "displayName": "Workflow Status",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "Beginning",
+                  "value": "Beginning"
+                },
+                {
+                  "name": "Queued",
+                  "value": "Queued"
+                },
+                {
+                  "name": "Processing",
+                  "value": "Processing"
+                },
+                {
+                  "name": "Awaiting Approval",
+                  "value": "Awaiting Approval"
+                },
+                {
+                  "name": "Approved",
+                  "value": "Approved"
+                },
+                {
+                  "name": "Failed",
+                  "value": "Failed"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Notes",
+              "displayName": "Notes",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Review Status",
+              "displayName": "Review Status",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Last Modified Time",
+              "displayName": "Last Modified Time",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": true
+            },
+            {
+              "id": "LinkedIn Status",
+              "displayName": "LinkedIn Status",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "Draft",
+                  "value": "Draft"
+                },
+                {
+                  "name": "Scheduled",
+                  "value": "Scheduled"
+                },
+                {
+                  "name": "Published",
+                  "value": "Published"
+                },
+                {
+                  "name": "Failed",
+                  "value": "Failed"
+                },
+                {
+                  "name": "Archived",
+                  "value": "Archived"
+                }
+              ],
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Scheduled Date",
+              "displayName": "Scheduled Date",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Published Date",
+              "displayName": "Published Date",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Voice Pack",
+              "displayName": "Voice Pack",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Content Source",
+              "displayName": "Content Source",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Draft Text",
+              "displayName": "Draft Text",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "QA Pass",
+              "displayName": "QA Pass",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "QA Issues",
+              "displayName": "QA Issues",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "RunID",
+              "displayName": "RunID",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Last Step",
+              "displayName": "Last Step",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Last Error",
+              "displayName": "Last Error",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Voice Context",
+              "displayName": "Voice Context",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Scaffold",
+              "displayName": "Scaffold",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Key Points",
+              "displayName": "Key Points",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [
+        288,
+        416
+      ],
+      "id": "e62ff09f-58ba-4070-aa1e-4b6e4e56f94a",
+      "name": "Create a record",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "meUymQhIYdbiv1Zh",
+          "name": "LinkedIn Posting Token"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "On form submission": {
+      "main": [
+        [
+          {
+            "node": "Create a record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "saveManualExecutions": true,
+    "saveExecutionProgress": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": true,
+    "timeSavedMode": "fixed"
+  },
+  "staticData": {
+    "node:New Post Created": {
+      "lastTimeChecked": "2026-02-01T17:45:33Z"
+    },
+    "node:Schedule Trigger": {
+      "recurrenceRules": []
+    },
+    "node:Airtable Trigger": {
+      "lastTimeChecked": "2026-02-02T03:19:26Z"
+    }
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {},
+  "versionId": "73da15cf-8beb-49bc-a276-ed73c37cc0ec",
+  "activeVersionId": "73da15cf-8beb-49bc-a276-ed73c37cc0ec",
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-02-02T03:19:54.208Z",
+      "createdAt": "2026-02-02T03:19:54.208Z",
+      "role": "workflow:owner",
+      "workflowId": "Z8IpUKOcqPkg04rt",
+      "projectId": "JXFm39uiH4OT7tOz"
+    }
+  ],
+  "activeVersion": {
+    "updatedAt": "2026-02-18T18:04:55.616Z",
+    "createdAt": "2026-02-18T18:04:55.616Z",
+    "versionId": "73da15cf-8beb-49bc-a276-ed73c37cc0ec",
+    "workflowId": "Z8IpUKOcqPkg04rt",
+    "nodes": [
+      {
+        "parameters": {
+          "content": "## LC-Intake\n\n**Purpose**: When you create a new row in the Posts table, this workflow automatically:\n1. Fetches content from the source URL (if provided)\n2. Extracts readable text from the page\n3. Sets status to \"Captured\" (which triggers LC-Draft-Polish)\n\n**Your workflow**:\n1. Go to Airtable Posts table\n2. Create new row: paste source_url, type my_take, select intake_type + content_pillar\n3. This workflow fires automatically and enriches the record\n4. LC-Draft-Polish then picks it up and generates a draft\n\n**Setup**:\n1. Replace PLACEHOLDER_BASE_ID with your Airtable base ID\n2. Replace PLACEHOLDER_POSTS_TABLE_ID with your Posts table ID\n3. Make sure Posts table has a 'created_at' field (type: Created Time)",
+          "height": 752
+        },
+        "id": "c56c4c9c-198e-4202-8085-2693feb3e737",
+        "name": "Sticky Note",
+        "type": "n8n-nodes-base.stickyNote",
+        "typeVersion": 1,
+        "position": [
+          -352,
+          64
+        ]
+      },
+      {
+        "parameters": {
+          "formTitle": "LinkedIn Post",
+          "formFields": {
+            "values": [
+              {
+                "fieldLabel": "Title"
+              },
+              {
+                "fieldLabel": "Pillar",
+                "fieldType": "dropdown",
+                "fieldOptions": {
+                  "values": [
+                    {
+                      "option": "GTM Engineering"
+                    },
+                    {
+                      "option": "Personal Projects"
+                    },
+                    {
+                      "option": "Tech Updates"
+                    }
+                  ]
+                },
+                "requiredField": true
+              },
+              {
+                "fieldLabel": "Attachments"
+              },
+              {
+                "fieldLabel": "Post Body",
+                "requiredField": true
+              },
+              {
+                "fieldLabel": "Intake Type",
+                "fieldType": "dropdown",
+                "fieldOptions": {
+                  "values": [
+                    {
+                      "option": "Repost with my Take"
+                    },
+                    {
+                      "option": "Tech News"
+                    },
+                    {
+                      "option": "YouTube"
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          "options": {
+            "appendAttribution": false
+          }
+        },
+        "type": "n8n-nodes-base.formTrigger",
+        "typeVersion": 2.3,
+        "position": [
+          64,
+          416
+        ],
+        "id": "d297d5be-da5f-430a-8493-bb9715b7f8a7",
+        "name": "On form submission",
+        "webhookId": "6d424daa-5b40-4ced-885d-56fe76bb25a9"
+      },
+      {
+        "parameters": {
+          "operation": "create",
+          "base": {
+            "__rl": true,
+            "value": "appvWjinwsRDhMlWF",
+            "mode": "list",
+            "cachedResultName": "LinkedIn Post Copilot",
+            "cachedResultUrl": "https://airtable.com/appvWjinwsRDhMlWF"
+          },
+          "table": {
+            "__rl": true,
+            "value": "tblUupIRZQpiSFbCk",
+            "mode": "list",
+            "cachedResultName": "Posts",
+            "cachedResultUrl": "https://airtable.com/appvWjinwsRDhMlWF/tblUupIRZQpiSFbCk"
+          },
+          "columns": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "Title": "={{ $json.Title }}",
+              "Pillar": "={{ $json.Pillar }}",
+              "Post Body": "={{ $json['Post Body'] }}",
+              "Attachments": "={{ $json.Attachments }}",
+              "Workflow Status": "Beginning"
+            },
+            "matchingColumns": [],
+            "schema": [
+              {
+                "id": "Title",
+                "displayName": "Title",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": false
+              },
+              {
+                "id": "Pillar",
+                "displayName": "Pillar",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "options",
+                "options": [
+                  {
+                    "name": "GTM Engineering",
+                    "value": "GTM Engineering"
+                  },
+                  {
+                    "name": "Personal Projects",
+                    "value": "Personal Projects"
+                  },
+                  {
+                    "name": "Tech Updates",
+                    "value": "Tech Updates"
+                  }
+                ],
+                "readOnly": false,
+                "removed": false
+              },
+              {
+                "id": "Post Body",
+                "displayName": "Post Body",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": false
+              },
+              {
+                "id": "Attachments",
+                "displayName": "Attachments",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": false
+              },
+              {
+                "id": "Workflow Status",
+                "displayName": "Workflow Status",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "options",
+                "options": [
+                  {
+                    "name": "Beginning",
+                    "value": "Beginning"
+                  },
+                  {
+                    "name": "Queued",
+                    "value": "Queued"
+                  },
+                  {
+                    "name": "Processing",
+                    "value": "Processing"
+                  },
+                  {
+                    "name": "Awaiting Approval",
+                    "value": "Awaiting Approval"
+                  },
+                  {
+                    "name": "Approved",
+                    "value": "Approved"
+                  },
+                  {
+                    "name": "Failed",
+                    "value": "Failed"
+                  }
+                ],
+                "readOnly": false,
+                "removed": false
+              },
+              {
+                "id": "Notes",
+                "displayName": "Notes",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Review Status",
+                "displayName": "Review Status",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "boolean",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Last Modified Time",
+                "displayName": "Last Modified Time",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": true,
+                "removed": true
+              },
+              {
+                "id": "LinkedIn Status",
+                "displayName": "LinkedIn Status",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "options",
+                "options": [
+                  {
+                    "name": "Draft",
+                    "value": "Draft"
+                  },
+                  {
+                    "name": "Scheduled",
+                    "value": "Scheduled"
+                  },
+                  {
+                    "name": "Published",
+                    "value": "Published"
+                  },
+                  {
+                    "name": "Failed",
+                    "value": "Failed"
+                  },
+                  {
+                    "name": "Archived",
+                    "value": "Archived"
+                  }
+                ],
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Scheduled Date",
+                "displayName": "Scheduled Date",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "dateTime",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Published Date",
+                "displayName": "Published Date",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "dateTime",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Voice Pack",
+                "displayName": "Voice Pack",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "array",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Content Source",
+                "displayName": "Content Source",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "array",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Draft Text",
+                "displayName": "Draft Text",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "QA Pass",
+                "displayName": "QA Pass",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "boolean",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "QA Issues",
+                "displayName": "QA Issues",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "RunID",
+                "displayName": "RunID",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Last Step",
+                "displayName": "Last Step",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Last Error",
+                "displayName": "Last Error",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Voice Context",
+                "displayName": "Voice Context",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Scaffold",
+                "displayName": "Scaffold",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Key Points",
+                "displayName": "Key Points",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              }
+            ],
+            "attemptToConvertTypes": false,
+            "convertFieldsToString": false
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.airtable",
+        "typeVersion": 2.1,
+        "position": [
+          288,
+          416
+        ],
+        "id": "e62ff09f-58ba-4070-aa1e-4b6e4e56f94a",
+        "name": "Create a record",
+        "credentials": {
+          "airtableTokenApi": {
+            "id": "meUymQhIYdbiv1Zh",
+            "name": "LinkedIn Posting Token"
+          }
+        }
+      }
+    ],
+    "connections": {
+      "On form submission": {
+        "main": [
+          [
+            {
+              "node": "Create a record",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Brian Joseph",
+    "name": null,
+    "description": null
+  },
+  "tags": [
+    {
+      "updatedAt": "2026-02-18T18:04:30.191Z",
+      "createdAt": "2026-02-18T18:04:30.191Z",
+      "id": "0qJQZcw3hY0HqZvd",
+      "name": "LinkedInPoster"
+    }
+  ],
+  "targetRepo": "LinkedIn-Poster"
+}
