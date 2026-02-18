@@ -1,0 +1,1291 @@
+{
+  "updatedAt": "2026-02-18T18:04:35.276Z",
+  "createdAt": "2026-01-31T19:00:55.835Z",
+  "id": "SJAGmLHQc4zC7Gsh",
+  "name": "WF1: Enrich",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "// Process all items that came through the URL branch\nconst items = $input.all();\n\nreturn items.map(item => {\n  const record = item.json;\n  const html = typeof record.data === 'string' ? record.data : (record.body || '');\n  let sourceText = '';\n\n  if (typeof html === 'string' && html.length > 100) {\n    \n    // 1. Try to isolate the main article content first \n    // This ignores headers, footers, and sidebars\n    let contentMatch = html.match(/<article[^>]*>([\\s\\S]*?)<\\/article>/i) || \n                       html.match(/<main[^>]*>([\\s\\S]*?)<\\/main>/i);\n    \n    let rawContent = contentMatch ? contentMatch[1] : html;\n\n    // 2. Clean the HTML\n    sourceText = rawContent\n      .replace(/<script[\\s\\S]*?<\\/script>/gi, '') // Remove scripts\n      .replace(/<style[\\s\\S]*?<\\/style>/gi, '')   // Remove CSS\n      .replace(/<[^>]+>/g, ' ')                   // Strip all other HTML tags\n      .replace(/&nbsp;/g, ' ')                    // Clean up common HTML entities\n      .replace(/\\s+/g, ' ')                       // Collapse multiple spaces/newlines\n      .trim();\n\n    // 3. Fallback: If cleaning resulted in almost nothing, try Meta Tags\n    if (sourceText.length < 100) {\n      const ogMatch = html.match(/<meta[^>]*property=[\"']og:description[\"'][^>]*content=[\"']([^\"']+)[\"']/i);\n      const titleMatch = html.match(/<title[^>]*>([^<]+)<\\/title>/i);\n      \n      sourceText = (ogMatch ? ogMatch[1] : '') + \n                   (titleMatch ? ' | ' + titleMatch[1] : '');\n    }\n  }\n\n  // Final fallback to Notes or Post Body\n  if (!sourceText || sourceText.length < 20) {\n    sourceText = record.Notes || record['Post Body'] || '[Source content could not be fetched.]';\n  }\n\n  return {\n    json: {\n      record_id: record.id,\n      // Increased limit to 10k to ensure you get the full article\n      source_text: sourceText.substring(0, 10000) \n    }\n  };\n});"
+      },
+      "id": "lc-intake-extract",
+      "name": "Extract Text from Source",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1264,
+        640
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Process all items that came through the no-URL branch\nconst items = $input.all();\n\nreturn items.map(item => {\n  const record = item.json;\n  return {\n    json: {\n      record_id: record.id,\n      source_text: record.Notes || record['Post Body'] || '[No source content provided. Add notes or a URL.]'\n    }\n  };\n});"
+      },
+      "id": "lc-intake-no-url",
+      "name": "Use Notes as Source",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1264,
+        832
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "base": {
+          "__rl": true,
+          "value": "appvWjinwsRDhMlWF",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Post Copilot",
+          "cachedResultUrl": "https://airtable.com/appvWjinwsRDhMlWF"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblUupIRZQpiSFbCk",
+          "mode": "list",
+          "cachedResultName": "Posts",
+          "cachedResultUrl": "https://airtable.com/appvWjinwsRDhMlWF/tblUupIRZQpiSFbCk"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $('Find Unprocessed Posts').item.json.id }}",
+            "Workflow Status": "Queued",
+            "Notes": "={{ $json.source_text }}",
+            "Intake Type": "={{ $('Find Unprocessed Posts').item.json['Intake Type'] }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": false
+            },
+            {
+              "id": "Title",
+              "displayName": "Title",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Pillar",
+              "displayName": "Pillar",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "GTM Engineering",
+                  "value": "GTM Engineering"
+                },
+                {
+                  "name": "Personal Projects",
+                  "value": "Personal Projects"
+                },
+                {
+                  "name": "Tech Updates",
+                  "value": "Tech Updates"
+                }
+              ],
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Intake Type",
+              "displayName": "Intake Type",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "YouTube",
+                  "value": "YouTube"
+                },
+                {
+                  "name": "Tech News",
+                  "value": "Tech News"
+                },
+                {
+                  "name": "Repost with my take",
+                  "value": "Repost with my take"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Attachments",
+              "displayName": "Attachments",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Workflow Status",
+              "displayName": "Workflow Status",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "Beginning",
+                  "value": "Beginning"
+                },
+                {
+                  "name": "Queued",
+                  "value": "Queued"
+                },
+                {
+                  "name": "Processing",
+                  "value": "Processing"
+                },
+                {
+                  "name": "Awaiting Approval",
+                  "value": "Awaiting Approval"
+                },
+                {
+                  "name": "Approved",
+                  "value": "Approved"
+                },
+                {
+                  "name": "Failed",
+                  "value": "Failed"
+                },
+                {
+                  "name": "{{$json[\"Workflow Status\"]}}",
+                  "value": "{{$json[\"Workflow Status\"]}}"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Notes",
+              "displayName": "Notes",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Post Body",
+              "displayName": "Post Body",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Review Status",
+              "displayName": "Review Status",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Modified",
+              "displayName": "Modified",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": true
+            },
+            {
+              "id": "Scheduled Date",
+              "displayName": "Scheduled Date",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Published Date",
+              "displayName": "Published Date",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Voice Pack",
+              "displayName": "Voice Pack",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Content Source",
+              "displayName": "Content Source",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Draft Text",
+              "displayName": "Draft Text",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "QA Pass",
+              "displayName": "QA Pass",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "QA Issues",
+              "displayName": "QA Issues",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "RunID",
+              "displayName": "RunID",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Last Step",
+              "displayName": "Last Step",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Last Error",
+              "displayName": "Last Error",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Voice Context",
+              "displayName": "Voice Context",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Scaffold",
+              "displayName": "Scaffold",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Key Points",
+              "displayName": "Key Points",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "lc-intake-update",
+      "name": "Update Record: Captured",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [
+        1488,
+        736
+      ],
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "meUymQhIYdbiv1Zh",
+          "name": "LinkedIn Posting Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## LC-Intake-Enrich\n\n**Purpose**: When you create a new row in the Posts table, this workflow automatically:\n1. Fetches content from the source URL (if provided)\n2. Extracts readable text from the page\n3. Sets status to \"Captured\" (which triggers LC-Draft-Polish)\n\n**Your workflow**:\n1. Go to Airtable Posts table\n2. Create new row: paste source_url, type my_take, select intake_type + content_pillar\n3. This workflow fires automatically and enriches the record\n4. LC-Draft-Polish then picks it up and generates a draft\n\n**Setup**:\n1. Replace PLACEHOLDER_BASE_ID with your Airtable base ID\n2. Replace PLACEHOLDER_POSTS_TABLE_ID with your Posts table ID\n3. Make sure Posts table has a 'created_at' field (type: Created Time)",
+        "height": 752
+      },
+      "id": "lc-intake-sticky",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -592,
+        416
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          },
+          "timeout": 10000
+        }
+      },
+      "id": "lc-intake-fetch",
+      "name": "HTTP Source Content Fetcher",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1040,
+        640
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "attachment-check-1",
+              "leftValue": "={{ $json.Attachments && $json.Attachments.length > 0 }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "lc-intake-check-url",
+      "name": "URL or nah?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        192,
+        736
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "search",
+        "base": {
+          "__rl": true,
+          "value": "appvWjinwsRDhMlWF",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Post Copilot",
+          "cachedResultUrl": "https://airtable.com/appvWjinwsRDhMlWF"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblUupIRZQpiSFbCk",
+          "mode": "list",
+          "cachedResultName": "Posts",
+          "cachedResultUrl": "https://airtable.com/appvWjinwsRDhMlWF/tblUupIRZQpiSFbCk"
+        },
+        "filterByFormula": "{Workflow Status} = \"Beginning\"",
+        "options": {}
+      },
+      "id": "lc-intake-search",
+      "name": "Find Unprocessed Posts",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [
+        -32,
+        736
+      ],
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "meUymQhIYdbiv1Zh",
+          "name": "LinkedIn Posting Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 12
+            }
+          ]
+        }
+      },
+      "id": "lc-intake-schedule",
+      "name": "Every 12 hrs",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -256,
+        736
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const attachmentsString = $input.item.json.Attachments;\n\n// 1. Split the string by the comma\n// 2. Trim any accidental whitespace\n// 3. Map them into individual items for n8n\nreturn attachmentsString.split(',').map(url => {\n  return {\n    json: {\n      url: url.trim()\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        656,
+        624
+      ],
+      "id": "0d397ee4-e184-4c04-ab09-75a2d13974a8",
+      "name": "Code in JavaScript"
+    }
+  ],
+  "connections": {
+    "Extract Text from Source": {
+      "main": [
+        [
+          {
+            "node": "Update Record: Captured",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Use Notes as Source": {
+      "main": [
+        [
+          {
+            "node": "Update Record: Captured",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Source Content Fetcher": {
+      "main": [
+        [
+          {
+            "node": "Extract Text from Source",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "URL or nah?": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Use Notes as Source",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Unprocessed Posts": {
+      "main": [
+        [
+          {
+            "node": "URL or nah?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Every 12 hrs": {
+      "main": [
+        [
+          {
+            "node": "Find Unprocessed Posts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "HTTP Source Content Fetcher",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "saveManualExecutions": true,
+    "saveExecutionProgress": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": true
+  },
+  "staticData": {
+    "node:New Post Created": {
+      "lastTimeChecked": "2026-02-01T17:45:33Z"
+    },
+    "node:Schedule Trigger": {
+      "recurrenceRules": []
+    },
+    "node:Airtable Trigger": {
+      "lastTimeChecked": "2026-02-02T03:21:19Z"
+    },
+    "node:Every 12 hrs": {
+      "recurrenceRules": [
+        12
+      ]
+    }
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {},
+  "versionId": "b0482eac-5934-48d8-ab64-088f33eda0e0",
+  "activeVersionId": "b0482eac-5934-48d8-ab64-088f33eda0e0",
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-01-31T19:00:55.838Z",
+      "createdAt": "2026-01-31T19:00:55.838Z",
+      "role": "workflow:owner",
+      "workflowId": "SJAGmLHQc4zC7Gsh",
+      "projectId": "JXFm39uiH4OT7tOz"
+    }
+  ],
+  "activeVersion": {
+    "updatedAt": "2026-02-18T18:04:35.277Z",
+    "createdAt": "2026-02-18T18:04:35.277Z",
+    "versionId": "b0482eac-5934-48d8-ab64-088f33eda0e0",
+    "workflowId": "SJAGmLHQc4zC7Gsh",
+    "nodes": [
+      {
+        "parameters": {
+          "jsCode": "// Process all items that came through the URL branch\nconst items = $input.all();\n\nreturn items.map(item => {\n  const record = item.json;\n  const html = typeof record.data === 'string' ? record.data : (record.body || '');\n  let sourceText = '';\n\n  if (typeof html === 'string' && html.length > 100) {\n    \n    // 1. Try to isolate the main article content first \n    // This ignores headers, footers, and sidebars\n    let contentMatch = html.match(/<article[^>]*>([\\s\\S]*?)<\\/article>/i) || \n                       html.match(/<main[^>]*>([\\s\\S]*?)<\\/main>/i);\n    \n    let rawContent = contentMatch ? contentMatch[1] : html;\n\n    // 2. Clean the HTML\n    sourceText = rawContent\n      .replace(/<script[\\s\\S]*?<\\/script>/gi, '') // Remove scripts\n      .replace(/<style[\\s\\S]*?<\\/style>/gi, '')   // Remove CSS\n      .replace(/<[^>]+>/g, ' ')                   // Strip all other HTML tags\n      .replace(/&nbsp;/g, ' ')                    // Clean up common HTML entities\n      .replace(/\\s+/g, ' ')                       // Collapse multiple spaces/newlines\n      .trim();\n\n    // 3. Fallback: If cleaning resulted in almost nothing, try Meta Tags\n    if (sourceText.length < 100) {\n      const ogMatch = html.match(/<meta[^>]*property=[\"']og:description[\"'][^>]*content=[\"']([^\"']+)[\"']/i);\n      const titleMatch = html.match(/<title[^>]*>([^<]+)<\\/title>/i);\n      \n      sourceText = (ogMatch ? ogMatch[1] : '') + \n                   (titleMatch ? ' | ' + titleMatch[1] : '');\n    }\n  }\n\n  // Final fallback to Notes or Post Body\n  if (!sourceText || sourceText.length < 20) {\n    sourceText = record.Notes || record['Post Body'] || '[Source content could not be fetched.]';\n  }\n\n  return {\n    json: {\n      record_id: record.id,\n      // Increased limit to 10k to ensure you get the full article\n      source_text: sourceText.substring(0, 10000) \n    }\n  };\n});"
+        },
+        "id": "lc-intake-extract",
+        "name": "Extract Text from Source",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1264,
+          640
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "// Process all items that came through the no-URL branch\nconst items = $input.all();\n\nreturn items.map(item => {\n  const record = item.json;\n  return {\n    json: {\n      record_id: record.id,\n      source_text: record.Notes || record['Post Body'] || '[No source content provided. Add notes or a URL.]'\n    }\n  };\n});"
+        },
+        "id": "lc-intake-no-url",
+        "name": "Use Notes as Source",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1264,
+          832
+        ]
+      },
+      {
+        "parameters": {
+          "operation": "upsert",
+          "base": {
+            "__rl": true,
+            "value": "appvWjinwsRDhMlWF",
+            "mode": "list",
+            "cachedResultName": "LinkedIn Post Copilot",
+            "cachedResultUrl": "https://airtable.com/appvWjinwsRDhMlWF"
+          },
+          "table": {
+            "__rl": true,
+            "value": "tblUupIRZQpiSFbCk",
+            "mode": "list",
+            "cachedResultName": "Posts",
+            "cachedResultUrl": "https://airtable.com/appvWjinwsRDhMlWF/tblUupIRZQpiSFbCk"
+          },
+          "columns": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "id": "={{ $('Find Unprocessed Posts').item.json.id }}",
+              "Workflow Status": "Queued",
+              "Notes": "={{ $json.source_text }}",
+              "Intake Type": "={{ $('Find Unprocessed Posts').item.json['Intake Type'] }}"
+            },
+            "matchingColumns": [
+              "id"
+            ],
+            "schema": [
+              {
+                "id": "id",
+                "displayName": "id",
+                "required": false,
+                "defaultMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": true,
+                "removed": false
+              },
+              {
+                "id": "Title",
+                "displayName": "Title",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Pillar",
+                "displayName": "Pillar",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "options",
+                "options": [
+                  {
+                    "name": "GTM Engineering",
+                    "value": "GTM Engineering"
+                  },
+                  {
+                    "name": "Personal Projects",
+                    "value": "Personal Projects"
+                  },
+                  {
+                    "name": "Tech Updates",
+                    "value": "Tech Updates"
+                  }
+                ],
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Intake Type",
+                "displayName": "Intake Type",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "options",
+                "options": [
+                  {
+                    "name": "YouTube",
+                    "value": "YouTube"
+                  },
+                  {
+                    "name": "Tech News",
+                    "value": "Tech News"
+                  },
+                  {
+                    "name": "Repost with my take",
+                    "value": "Repost with my take"
+                  }
+                ],
+                "readOnly": false,
+                "removed": false
+              },
+              {
+                "id": "Attachments",
+                "displayName": "Attachments",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Workflow Status",
+                "displayName": "Workflow Status",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "options",
+                "options": [
+                  {
+                    "name": "Beginning",
+                    "value": "Beginning"
+                  },
+                  {
+                    "name": "Queued",
+                    "value": "Queued"
+                  },
+                  {
+                    "name": "Processing",
+                    "value": "Processing"
+                  },
+                  {
+                    "name": "Awaiting Approval",
+                    "value": "Awaiting Approval"
+                  },
+                  {
+                    "name": "Approved",
+                    "value": "Approved"
+                  },
+                  {
+                    "name": "Failed",
+                    "value": "Failed"
+                  },
+                  {
+                    "name": "{{$json[\"Workflow Status\"]}}",
+                    "value": "{{$json[\"Workflow Status\"]}}"
+                  }
+                ],
+                "readOnly": false,
+                "removed": false
+              },
+              {
+                "id": "Notes",
+                "displayName": "Notes",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": false
+              },
+              {
+                "id": "Post Body",
+                "displayName": "Post Body",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Review Status",
+                "displayName": "Review Status",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "boolean",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Modified",
+                "displayName": "Modified",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": true,
+                "removed": true
+              },
+              {
+                "id": "Scheduled Date",
+                "displayName": "Scheduled Date",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "dateTime",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Published Date",
+                "displayName": "Published Date",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "dateTime",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Voice Pack",
+                "displayName": "Voice Pack",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "array",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Content Source",
+                "displayName": "Content Source",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "array",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Draft Text",
+                "displayName": "Draft Text",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "QA Pass",
+                "displayName": "QA Pass",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "boolean",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "QA Issues",
+                "displayName": "QA Issues",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "RunID",
+                "displayName": "RunID",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Last Step",
+                "displayName": "Last Step",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Last Error",
+                "displayName": "Last Error",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Voice Context",
+                "displayName": "Voice Context",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Scaffold",
+                "displayName": "Scaffold",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              },
+              {
+                "id": "Key Points",
+                "displayName": "Key Points",
+                "required": false,
+                "defaultMatch": false,
+                "canBeUsedToMatch": true,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": true
+              }
+            ],
+            "attemptToConvertTypes": false,
+            "convertFieldsToString": false
+          },
+          "options": {}
+        },
+        "id": "lc-intake-update",
+        "name": "Update Record: Captured",
+        "type": "n8n-nodes-base.airtable",
+        "typeVersion": 2,
+        "position": [
+          1488,
+          736
+        ],
+        "credentials": {
+          "airtableTokenApi": {
+            "id": "meUymQhIYdbiv1Zh",
+            "name": "LinkedIn Posting Token"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "content": "## LC-Intake-Enrich\n\n**Purpose**: When you create a new row in the Posts table, this workflow automatically:\n1. Fetches content from the source URL (if provided)\n2. Extracts readable text from the page\n3. Sets status to \"Captured\" (which triggers LC-Draft-Polish)\n\n**Your workflow**:\n1. Go to Airtable Posts table\n2. Create new row: paste source_url, type my_take, select intake_type + content_pillar\n3. This workflow fires automatically and enriches the record\n4. LC-Draft-Polish then picks it up and generates a draft\n\n**Setup**:\n1. Replace PLACEHOLDER_BASE_ID with your Airtable base ID\n2. Replace PLACEHOLDER_POSTS_TABLE_ID with your Posts table ID\n3. Make sure Posts table has a 'created_at' field (type: Created Time)",
+          "height": 752
+        },
+        "id": "lc-intake-sticky",
+        "name": "Sticky Note",
+        "type": "n8n-nodes-base.stickyNote",
+        "typeVersion": 1,
+        "position": [
+          -592,
+          416
+        ]
+      },
+      {
+        "parameters": {
+          "url": "={{ $json.url }}",
+          "options": {
+            "response": {
+              "response": {
+                "responseFormat": "text"
+              }
+            },
+            "timeout": 10000
+          }
+        },
+        "id": "lc-intake-fetch",
+        "name": "HTTP Source Content Fetcher",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          1040,
+          640
+        ],
+        "onError": "continueRegularOutput"
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict",
+              "version": 1
+            },
+            "conditions": [
+              {
+                "id": "attachment-check-1",
+                "leftValue": "={{ $json.Attachments && $json.Attachments.length > 0 }}",
+                "rightValue": "",
+                "operator": {
+                  "type": "boolean",
+                  "operation": "true",
+                  "singleValue": true
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "id": "lc-intake-check-url",
+        "name": "URL or nah?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2,
+        "position": [
+          192,
+          736
+        ]
+      },
+      {
+        "parameters": {
+          "operation": "search",
+          "base": {
+            "__rl": true,
+            "value": "appvWjinwsRDhMlWF",
+            "mode": "list",
+            "cachedResultName": "LinkedIn Post Copilot",
+            "cachedResultUrl": "https://airtable.com/appvWjinwsRDhMlWF"
+          },
+          "table": {
+            "__rl": true,
+            "value": "tblUupIRZQpiSFbCk",
+            "mode": "list",
+            "cachedResultName": "Posts",
+            "cachedResultUrl": "https://airtable.com/appvWjinwsRDhMlWF/tblUupIRZQpiSFbCk"
+          },
+          "filterByFormula": "{Workflow Status} = \"Beginning\"",
+          "options": {}
+        },
+        "id": "lc-intake-search",
+        "name": "Find Unprocessed Posts",
+        "type": "n8n-nodes-base.airtable",
+        "typeVersion": 2.1,
+        "position": [
+          -32,
+          736
+        ],
+        "credentials": {
+          "airtableTokenApi": {
+            "id": "meUymQhIYdbiv1Zh",
+            "name": "LinkedIn Posting Token"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "hours",
+                "hoursInterval": 12
+              }
+            ]
+          }
+        },
+        "id": "lc-intake-schedule",
+        "name": "Every 12 hrs",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.2,
+        "position": [
+          -256,
+          736
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "const attachmentsString = $input.item.json.Attachments;\n\n// 1. Split the string by the comma\n// 2. Trim any accidental whitespace\n// 3. Map them into individual items for n8n\nreturn attachmentsString.split(',').map(url => {\n  return {\n    json: {\n      url: url.trim()\n    }\n  };\n});"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          656,
+          624
+        ],
+        "id": "0d397ee4-e184-4c04-ab09-75a2d13974a8",
+        "name": "Code in JavaScript"
+      }
+    ],
+    "connections": {
+      "Extract Text from Source": {
+        "main": [
+          [
+            {
+              "node": "Update Record: Captured",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Use Notes as Source": {
+        "main": [
+          [
+            {
+              "node": "Update Record: Captured",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "HTTP Source Content Fetcher": {
+        "main": [
+          [
+            {
+              "node": "Extract Text from Source",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "URL or nah?": {
+        "main": [
+          [
+            {
+              "node": "Code in JavaScript",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Use Notes as Source",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Find Unprocessed Posts": {
+        "main": [
+          [
+            {
+              "node": "URL or nah?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Every 12 hrs": {
+        "main": [
+          [
+            {
+              "node": "Find Unprocessed Posts",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Code in JavaScript": {
+        "main": [
+          [
+            {
+              "node": "HTTP Source Content Fetcher",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Brian Joseph",
+    "name": null,
+    "description": null
+  },
+  "tags": [
+    {
+      "updatedAt": "2026-02-18T18:04:30.191Z",
+      "createdAt": "2026-02-18T18:04:30.191Z",
+      "id": "0qJQZcw3hY0HqZvd",
+      "name": "LinkedInPoster"
+    }
+  ],
+  "targetRepo": "LinkedIn-Poster"
+}
