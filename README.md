@@ -30,7 +30,7 @@ The workflow generates, reviews, and schedules LinkedIn posts based on:
 
 ### WF0: Intake
 
-<img width="524" height="179" alt="image" src="https://github.com/user-attachments/assets/5f096626-a1a6-407d-9a4d-48600bd5f6da" />
+<img width="524" height="179" alt="image" src="https://github.com/user-attachments/assets/8a6beb7f-393b-423d-8995-12e09487840b" />
 
 **Purpose:** Captures new content ideas when you create a row in Airtable
 
