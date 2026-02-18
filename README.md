@@ -30,7 +30,7 @@ The workflow generates, reviews, and schedules LinkedIn posts based on:
 
 ### WF0: Intake
 
-<img width="1626" height="543" alt="Intake Workflow" src="https://github.com/user-attachments/assets/bfdd8b19-9923-49b4-87c2-a2f565de9f68" />
+<img width="524" height="179" alt="image" src="https://github.com/user-attachments/assets/5f096626-a1a6-407d-9a4d-48600bd5f6da" />
 
 **Purpose:** Captures new content ideas when you create a row in Airtable
 
@@ -50,7 +50,7 @@ The workflow generates, reviews, and schedules LinkedIn posts based on:
 
 ### WF1: Intake-Enrich
 
-<img width="1610" height="555" alt="Intake-Enrich Workflow" src="https://github.com/user-attachments/assets/a347fc52-4762-4fb1-a5fb-9214814f0b82" />
+<img width="1402" height="255" alt="image" src="https://github.com/user-attachments/assets/4e41b289-0b44-4c60-87e1-dec1cbbad432" />
 
 **Purpose:** Enhanced intake flow with additional enrichment and validation
 
@@ -70,7 +70,7 @@ The workflow generates, reviews, and schedules LinkedIn posts based on:
 
 ### WF2: Draft-Polish (State Machine)
 
-<img width="1642" height="467" alt="Draft-Polish State Machine" src="https://github.com/user-attachments/assets/9d4ea109-fd2a-4fcb-be85-5db2f7755d50" />
+<img width="1495" height="192" alt="image" src="https://github.com/user-attachments/assets/a0f42c3f-efda-4c99-81b5-fbc025591723" />
 
 **Purpose:** Core state machine that generates, reviews, and manages LinkedIn drafts
 
@@ -111,6 +111,8 @@ The workflow generates, reviews, and schedules LinkedIn posts based on:
 ---
 
 ### WF3: RSS-Triage
+
+<img width="1416" height="309" alt="image" src="https://github.com/user-attachments/assets/72ae5dc9-32a4-4b72-b8d5-a220f88e2fd8" />
 
 **Purpose:** Automatically monitors RSS feeds, filters for relevance, creates intake records
 
